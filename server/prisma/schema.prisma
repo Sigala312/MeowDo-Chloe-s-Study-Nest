@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. 使用者模型（支援 OAuth 與 Gamification 數值）
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String? // 第三方登入的大頭貼
+
+  // 🎮 遊戲化機制 (Gamification)
+  level  Int @default(1)
+  exp    Int @default(0) // 當前經驗值
+  tokens Int @default(0) // 升級或完成專注獲得的代幣數
+
+  // 帳號與 Session (NextAuth / Auth.js 標準規格)
+  accounts Account[]
+  sessions Session[]
+
+  tasks     Task[]
+  pomodoros PomodoroLog[]
+  drawLogs  WheelDrawLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 2. 待辦事項模型
+model Task {
+  id            String    @id @default(cuid())
+  title         String // 事項名稱
+  isCompleted   Boolean   @default(false)
+  expReward     Int       @default(20) // 完成該任務可獲得的經驗值 (預設 20 EXP)
+  scheduledTime String? // 顯示時間標籤 (如 "10:00-11:30")
+  dueDate       DateTime?
+  completedAt   DateTime?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 3. 待辦分類模型
+model Category {
+  id    String  @id @default(cuid())
+  name  String // "📖 國考進度", "☕ 每日生活"
+  icon  String?
+  color String?
+  order Int     @default(0)
+
+  tasks Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 4. 🍅 番茄鐘紀錄模型
+model PomodoroLog {
+  id          String   @id @default(cuid())
+  durationMin Int      @default(25) // 專注分鐘數 (預設 25 分鐘)
+  expEarned   Int      @default(10) // 完成一次番茄鐘可獲得的經驗值
+  completedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// 5. 🎡 輪盤獎品項目
+model WheelReward {
+  id          String  @id @default(cuid())
+  title       String // 獎品名稱 (如 "☕ Max 請喝咖啡", "🐾 貓咪讚賞卡", "🎮 自由打電玩 1 小時")
+  icon        String? // 獎品圖示
+  probability Float // 中獎機率 (0.0 ~ 1.0)
+  isRare      Boolean @default(false) // 是否為稀有大獎
+
+  drawLogs WheelDrawLog[]
+}
+
+// 6. 🎟️ 抽獎歷史紀錄
+model WheelDrawLog {
+  id      String   @id @default(cuid())
+  drawnAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rewardId String
+  reward   WheelReward @relation(fields: [rewardId], references: [id])
+}
+
+// --- NextAuth.js 標準第三方登入模型 (Google / GitHub) ---
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String // "google", "github" 等
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
