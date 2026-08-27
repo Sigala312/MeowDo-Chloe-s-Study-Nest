@@ -4,60 +4,129 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PawPrint, Leaf, Mail, Lock, Eye, EyeOff, Loader2, Globe, User } from 'lucide-react';
+import { PawPrint, Leaf, Mail, Lock, Eye, EyeOff, Loader2, Globe, User, CheckCircle2, AlertCircle } from 'lucide-react';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export default function AuthFlow() {
   const router = useRouter();
   const [view, setView] = useState<'welcome' | 'login' | 'signup'>('welcome');
-  const [locale, setLocale] = useState<'zh' | 'en'>('zh');
+  const [locale, setLocale] = useState<'zh' | 'en'>('en');
 
-  // 登入/註冊表單 State
+  // Form States
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // English Alert Modal State
+  const [alertConfig, setAlertConfig] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+    image?: string;
+    onConfirm?: () => void;
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'success',
+  });
+
+  const showAlert = (
+    title: string, 
+    message: string, 
+    type: 'success' | 'error' = 'success', 
+    onConfirm?: () => void,
+    image: string = '/螢幕擷取畫面_2026-08-25_190915-removebg-preview.png'
+  ) => {
+    setAlertConfig({ show: true, title, message, type, image, onConfirm });
+  };
+
+  const closeAlert = () => {
+    const callback = alertConfig.onConfirm;
+    setAlertConfig(prev => ({ ...prev, show: false }));
+    if (callback) callback();
+  };
 
   const backgroundImageUrl = '/pexels-fabavica-19067613.jpg';
 
-  // 登入處理
+  // 1. Login Handler
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage('');
+
     try {
-      console.log('登入資訊：', { email, password });
-      await new Promise((res) => setTimeout(res, 1500));
-      // router.push('/dashboard');
-    } catch (error) {
-      console.error('登入失敗：', error);
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Invalid email or password.');
+      }
+
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+
+      showAlert('Login Successful! 🐾', 'Welcome back to MeowDo Study Nest.', 'success', () => {
+        router.push('/Home');
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Login failed. Please try again later.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 註冊處理
+  // 2. Sign Up Handler
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      alert('密碼與確認密碼不一致！');
+      setErrorMessage('Passwords do not match!');
       return;
     }
+
     setIsLoading(true);
+    setErrorMessage('');
+
     try {
-      console.log('註冊資訊：', { name, email, password });
-      await new Promise((res) => setTimeout(res, 1500));
-      // router.push('/dashboard');
-    } catch (error) {
-      console.error('註冊失敗：', error);
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Registration failed.');
+      }
+
+      showAlert('Account Created! 🎉', 'Your account is ready. Please log in.', 'success', () => {
+        setPassword('');
+        setConfirmPassword('');
+        setView('login');
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Sign up failed. Please try again later.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 第三方登入/註冊處理
+  // 3. Social Login Handler
   const handleSocialLogin = (provider: 'google' | 'apple') => {
-    console.log(`觸發 ${provider} 登入/註冊`);
+    window.location.href = `${API_BASE_URL}/api/auth/${provider}`;
   };
 
   return (
@@ -65,11 +134,59 @@ export default function AuthFlow() {
       className="h-screen w-full flex items-center justify-center p-4 font-sans relative overflow-hidden bg-cover bg-center bg-no-repeat select-none"
       style={{ backgroundImage: `url(${backgroundImageUrl})` }}
     >
-      {/* 背景遮罩與暖色光影 */}
       <div className="absolute inset-0 bg-[#785232]/10 mix-blend-multiply pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-stone-900/10 pointer-events-none" />
 
-      {/* 右上角多語系切換 */}
+      {/* Styled English Alert Modal */}
+<AnimatePresence>
+  {alertConfig.show && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        className="w-full max-w-xs bg-[#FAF6F0] rounded-3xl p-6 shadow-2xl border border-white/80 flex flex-col items-center text-center relative"
+      >
+        {/* 👈 判斷是否有圖片，有的話顯示 Image，沒有則顯示預設 Icon */}
+        {alertConfig.image ? (
+          <div className="relative w-20 h-20 mb-2">
+            <Image 
+              src={alertConfig.image} 
+              alt="Alert illustration" 
+              fill
+              className="object-contain"
+            />
+          </div>
+        ) : (
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+            alertConfig.type === 'success' ? 'bg-amber-100 text-[#8B5E3C]' : 'bg-red-100 text-red-600'
+          }`}>
+            {alertConfig.type === 'success' ? <CheckCircle2 className="w-7 h-7" /> : <AlertCircle className="w-7 h-7" />}
+          </div>
+        )}
+
+        <h3 className="text-base font-bold text-[#6C4E31] mb-1">{alertConfig.title}</h3>
+        <p className="text-xs text-[#8B5E3C]/80 mb-5 font-medium leading-relaxed">{alertConfig.message}</p>
+
+        <button
+          onClick={closeAlert}
+          className="w-full py-2.5 bg-[#8B5E3C] hover:bg-[#784E2F] text-amber-50 font-bold rounded-xl shadow-md transition-all text-xs cursor-pointer active:scale-95"
+        >
+          Continue
+        </button>
+      </motion.div>
+    </div>
+  )}
+</AnimatePresence>
+
+      {/* Error Message Toast */}
+      {errorMessage && (
+        <div className="absolute top-6 z-20 bg-red-100/90 backdrop-blur-sm border border-red-300 text-red-700 px-4 py-2 rounded-xl text-xs font-semibold shadow-md">
+          {errorMessage}
+        </div>
+      )}
+
+      {/* Language Toggle */}
       <div className="absolute top-4 right-4 md:top-6 md:right-6 z-10">
         <button
           onClick={() => setLocale(prev => prev === 'zh' ? 'en' : 'zh')}
@@ -81,13 +198,12 @@ export default function AuthFlow() {
         </button>
       </div>
 
-      {/* 核心卡片容器 */}
+      {/* Main Card */}
       <motion.div 
         layout
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className="relative w-full max-w-sm md:max-w-[400px] bg-[#FAF6F0]/50 backdrop-blur-md rounded-[2.5rem] md:rounded-[3rem] px-6 py-5 md:px-8 md:py-6 shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-white/60 flex flex-col items-center text-stone-700 overflow-hidden max-h-[95vh] overflow-y-auto"
       >
-        {/* Shared Hero Logo 區域 */}
         <motion.div 
           layout
           transition={{ type: "spring", stiffness: 300, damping: 28 }}
@@ -114,10 +230,8 @@ export default function AuthFlow() {
           </motion.div>
         </motion.div>
 
-        {/* 動態內容區域切換 */}
         <AnimatePresence mode="wait">
           {view === 'welcome' && (
-            /* ==================== 1. 歡迎頁內容 ==================== */
             <motion.div
               key="welcome-content"
               initial={{ opacity: 0, y: 12 }}
@@ -133,11 +247,10 @@ export default function AuthFlow() {
                 </p>
               </div>
 
-              {/* 按鈕區 */}
               <div className="w-full space-y-2 mb-3">
                 <button 
                   type="button"
-                  onClick={() => setView('login')}
+                  onClick={() => { setErrorMessage(''); setView('login'); }}
                   className="w-full py-2.5 md:py-3 px-6 bg-[#8B5E3C] hover:bg-[#784E2F] text-amber-50 font-bold rounded-2xl shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base cursor-pointer hover:-translate-y-0.5 active:scale-[0.98]"
                 >
                   <PawPrint className="w-4 h-4 md:w-5 md:h-5 fill-amber-100/20" />
@@ -146,7 +259,7 @@ export default function AuthFlow() {
 
                 <button 
                   type="button"
-                  onClick={() => setView('signup')}
+                  onClick={() => { setErrorMessage(''); setView('signup'); }}
                   className="w-full py-2.5 md:py-3 px-6 bg-[#F9F5F0]/90 hover:bg-white text-[#8B5E3C] font-bold rounded-2xl border border-[#D0BBA2] shadow-sm transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base cursor-pointer hover:-translate-y-0.5 active:scale-[0.98]"
                 >
                   <Leaf className="w-4 h-4 md:w-5 md:h-5 text-[#8B5E3C]" />
@@ -154,14 +267,12 @@ export default function AuthFlow() {
                 </button>
               </div>
 
-              {/* 分隔線 */}
               <div className="w-full flex items-center gap-3 my-2">
                 <div className="h-[1px] flex-1 bg-[#D8C7B5]/60" />
                 <span className="text-[10px] md:text-[11px] text-[#8B5E3C]/70 font-bold tracking-wider uppercase">or continue with</span>
                 <div className="h-[1px] flex-1 bg-[#D8C7B5]/60" />
               </div>
 
-              {/* 第三方圖示按鈕 */}
               <div className="flex items-center justify-center gap-5 mt-1">
                 <div className="flex flex-col items-center gap-1">
                   <button 
@@ -196,7 +307,6 @@ export default function AuthFlow() {
           )}
 
           {view === 'login' && (
-            /* ==================== 2. 登入頁內容 ==================== */
             <motion.div
               key="login-content"
               initial={{ opacity: 0, y: 12 }}
@@ -216,11 +326,11 @@ export default function AuthFlow() {
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B5E3C]/60" />
                   <input 
-                    type="text" 
+                    type="email" 
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email or username"
+                    placeholder="Email address"
                     className="w-full bg-white/70 border border-[#D0BBA2]/50 rounded-2xl py-2 pl-11 pr-4 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-[#8B5E3C]/20 transition-all placeholder:text-stone-400 font-medium text-stone-700"
                   />
                 </div>
@@ -300,7 +410,7 @@ export default function AuthFlow() {
                 Don&apos;t have an account?{' '}
                 <button 
                   type="button"
-                  onClick={() => setView('signup')}
+                  onClick={() => { setErrorMessage(''); setView('signup'); }}
                   className="text-[#C07A5D] hover:text-[#A05A3D] font-semibold cursor-pointer transition-colors"
                 >
                   Sign up
@@ -318,7 +428,6 @@ export default function AuthFlow() {
           )}
 
           {view === 'signup' && (
-            /* ==================== 3. 註冊頁內容 (已加入第三方按鈕) ==================== */
             <motion.div
               key="signup-content"
               initial={{ opacity: 0, y: 12 }}
@@ -334,7 +443,6 @@ export default function AuthFlow() {
                 </p>
               </div>
 
-              {/* 註冊表單 */}
               <form onSubmit={handleSignUpSubmit} className="w-full space-y-1.5 mb-2">
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B5E3C]/60" />
@@ -400,14 +508,12 @@ export default function AuthFlow() {
                 </button>
               </form>
 
-              {/* 分隔線 */}
               <div className="w-full flex items-center gap-3 my-1">
                 <div className="h-[1px] flex-1 bg-[#D8C7B5]/60" />
                 <span className="text-[11px] text-[#8B5E3C]/60 font-medium">or</span>
                 <div className="h-[1px] flex-1 bg-[#D8C7B5]/60" />
               </div>
 
-              {/* 🌟 註冊頁第三方登入按鈕區 */}
               <div className="w-full space-y-1.5 mb-2">
                 <button 
                   type="button"
@@ -435,19 +541,17 @@ export default function AuthFlow() {
                 </button>
               </div>
 
-              {/* 切換至 Log In */}
               <p className="text-[11px] text-stone-500 font-medium">
                 Already have an account?{' '}
                 <button 
                   type="button"
-                  onClick={() => setView('login')}
+                  onClick={() => { setErrorMessage(''); setView('login'); }}
                   className="text-[#C07A5D] hover:text-[#A05A3D] font-semibold cursor-pointer transition-colors"
                 >
                   Log in
                 </button>
               </p>
 
-              {/* 返回按鈕 */}
               <button 
                 type="button"
                 onClick={() => setView('welcome')}
@@ -458,7 +562,6 @@ export default function AuthFlow() {
             </motion.div>
           )}
         </AnimatePresence>
-
       </motion.div>
     </div>
   );
