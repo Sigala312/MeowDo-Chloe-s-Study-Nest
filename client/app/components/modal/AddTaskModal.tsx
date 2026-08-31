@@ -9,7 +9,8 @@ import { Button } from '../ui/Button';
 interface Category {
   id: string;
   name: string;
-  icon: string;
+  icon?: string | null;
+  color?: string | null;
 }
 
 interface AddTaskModalProps {
@@ -218,11 +219,16 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
       </div>
 
       {/* 巢狀彈窗 */}
-      <CreateCategoryModal
-        isOpen={isCategoryModalOpen}
-        onClose={() => setIsCategoryModalOpen(false)}
-        onAddCategory={handleCreateCategory}
-      />
+     <CreateCategoryModal
+  isOpen={isCategoryModalOpen}
+  onClose={() => setIsCategoryModalOpen(false)}
+  onSuccess={(newCat) => {
+    // 1. 新增到畫面的 categories 選項中
+    setCategories((prev) => [...prev, newCat]);
+    // 2. 自動選取剛建立好的分類
+    setSelectedCategory(newCat.name);
+  }}
+/>
 
       <AddTagModal
         isOpen={isTagModalOpen}

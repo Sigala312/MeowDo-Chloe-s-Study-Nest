@@ -2,30 +2,24 @@
 
 import React, { useState, useRef, useEffect, ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Check, User, LogOut } from 'lucide-react';
-
-/* ==========================================================================
-   1. 使用者個人選單 (User Dropdown Menu) - 包含頭像資訊卡片與操作選單
-   ========================================================================== */
+import Image from 'next/image';
+import { User, LogOut } from 'lucide-react';
 
 export interface UserProfile {
   name: string;
   email: string;
-  avatarIcon?: ReactNode;
+  avatarUrl?: string | null;
 }
 
 interface UserDropdownMenuProps {
-  user?: UserProfile;
+  user?: UserProfile | null;
   onLogout?: () => void;
   align?: 'left' | 'right';
   className?: string;
 }
 
 export const DropdownMenu: React.FC<UserDropdownMenuProps> = ({
-  user = {
-    name: 'Chloe',
-    email: 'chloe@email.com',
-  },
+  user,
   onLogout,
   align = 'right',
   className = '',
@@ -50,9 +44,19 @@ export const DropdownMenu: React.FC<UserDropdownMenuProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-10 h-10 rounded-2xl bg-[#F4E2D8] border-2 border-[#EADBC8] flex items-center justify-center text-xl overflow-hidden shadow-xs cursor-pointer hover:border-[#E07A5F] transition-all outline-none"
+        className="relative w-10 h-10 rounded-2xl bg-[#F4E2D8] border-2 border-[#EADBC8] flex items-center justify-center font-extrabold text-[#E89874] overflow-hidden shadow-xs cursor-pointer hover:border-[#E07A5F] transition-all outline-none"
       >
-        🐱
+        {user?.avatarUrl ? (
+          <Image
+            src={user.avatarUrl}
+            alt={user.name || 'User Avatar'}
+            fill
+            className="object-cover"
+            unoptimized
+          />
+        ) : (
+          user?.name?.[0]?.toUpperCase() || '🐱'
+        )}
       </button>
 
       {/* 下拉浮層 */}
@@ -64,18 +68,28 @@ export const DropdownMenu: React.FC<UserDropdownMenuProps> = ({
         >
           {/* 頂部個人資訊區塊 */}
           <div className="flex items-center gap-3 pb-3">
-            <div className="w-12 h-12 rounded-full bg-[#1C1C1C] flex items-center justify-center text-2xl overflow-hidden border border-[#EADBC8] shrink-0">
-              🐱
+            <div className="relative w-12 h-12 rounded-full bg-[#F4E2D8] flex items-center justify-center text-xl font-black text-[#E89874] overflow-hidden border border-[#EADBC8] shrink-0">
+              {user?.avatarUrl ? (
+                <Image
+                  src={user.avatarUrl}
+                  alt={user.name || 'User Avatar'}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                user?.name?.[0]?.toUpperCase() || '🐱'
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="font-black text-sm text-[#3D2C2E] truncate">
-                  {user.name}
+                  {user?.name || 'Loading...'}
                 </span>
-                <span className="text-sm">🐶</span>
+                <span className="text-sm">🐾</span>
               </div>
               <p className="text-xs text-[#8C7A6B] font-medium truncate">
-                {user.email}
+                {user?.email || ''}
               </p>
             </div>
           </div>
@@ -84,9 +98,8 @@ export const DropdownMenu: React.FC<UserDropdownMenuProps> = ({
 
           {/* 功能選項列表 */}
           <div className="py-1 space-y-1">
-            {/* Personal Information (Hover 時顯示橘粉色底色) */}
             <Link
-              href="Home/settings"
+              href="/Home/settings"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-transparent text-[#3D2C2E] text-xs font-extrabold hover:bg-[#FDF3E7] transition-all"
             >
@@ -109,105 +122,6 @@ export const DropdownMenu: React.FC<UserDropdownMenuProps> = ({
               <span>Log out</span>
             </button>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ==========================================================================
-   2. 表單單選下拉選單 (Select Component) - 用於表單數值切換（如語言、排序等）
-   ========================================================================== */
-
-export interface SelectOption {
-  value: string;
-  label: string;
-  icon?: ReactNode;
-}
-
-interface SelectProps {
-  options: SelectOption[];
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  className?: string;
-}
-
-export const Select: React.FC<SelectProps> = ({
-  options,
-  value,
-  onChange,
-  placeholder = 'Select an option',
-  disabled = false,
-  className = '',
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectRef = useRef<HTMLDivElement>(null);
-
-  const selectedOption = options.find((opt) => opt.value === value);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div className={`relative w-full ${className}`} ref={selectRef}>
-      {/* 選擇框本體 */}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-[#FAF6F0] border text-xs font-bold transition-all cursor-pointer outline-none ${
-          isOpen
-            ? 'border-[#E07A5F] ring-2 ring-[#E07A5F]/20'
-            : 'border-[#EADBC8] hover:border-[#D0BBA2]'
-        } ${disabled ? 'opacity-50 cursor-not-allowed bg-[#F5EFE8]' : ''}`}
-      >
-        <span className="flex items-center gap-2 text-[#3D2C2E] truncate">
-          {selectedOption?.icon && <span>{selectedOption.icon}</span>}
-          {selectedOption ? selectedOption.label : <span className="text-[#8C7A6B]">{placeholder}</span>}
-        </span>
-        <ChevronDown
-          className={`w-4 h-4 text-[#8C7A6B] transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-[#E07A5F]' : ''
-          }`}
-        />
-      </button>
-
-      {/* 下拉選單列表 */}
-      {isOpen && (
-        <div className="absolute z-50 mt-1.5 w-full bg-[#FFFDF9] border border-[#EADBC8] rounded-2xl p-1.5 shadow-xl max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-          {options.map((option) => {
-            const isSelected = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#FDF3E7] text-[#3D2C2E]'
-                    : 'text-[#6C5B52] hover:bg-[#FAF6F0] hover:text-[#3D2C2E]'
-                }`}
-              >
-                <span className="flex items-center gap-2 truncate">
-                  {option.icon && <span>{option.icon}</span>}
-                  <span>{option.label}</span>
-                </span>
-                {isSelected && <Check className="w-4 h-4 text-[#E07A5F]" />}
-              </button>
-            );
-          })}
         </div>
       )}
     </div>

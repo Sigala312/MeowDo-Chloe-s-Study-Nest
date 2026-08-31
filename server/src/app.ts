@@ -3,7 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import passport from './config/passport.js';
 import authRouter from './modules/auth/auth.router.js';
+import userRouter from './modules/user/user.router.js';
 import categoryRouter from './modules/category/category.router.js';
+import tagRouter from './modules/tag/tag.router.js';
 
 // 載入環境變數
 dotenv.config();
@@ -16,8 +18,8 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // 2. 初始化 Passport
 app.use(passport.initialize());
@@ -30,7 +32,12 @@ app.get('/health', (req: Request, res: Response) => {
 // 4. 掛載模組路由
 app.use('/api/auth', authRouter);
 
+app.use('/api/user', userRouter);
+
 app.use('/api/category', categoryRouter);
+
+app.use('/api/tag', tagRouter);
+
 // 5. 處理 404 路由
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });

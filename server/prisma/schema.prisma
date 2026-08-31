@@ -21,6 +21,9 @@ model User {
   emailVerified DateTime?
   password      String?
   image         String? // 第三方登入的大頭貼
+  bio           String? // 新增
+  location      String? // 新增
+  avatarUrl     String?   @db.LongText // 新增 (若已有 image 欄位，可視需求對應)
 
   // 🎮 遊戲化機制 (Gamification)
   level  Int @default(1)

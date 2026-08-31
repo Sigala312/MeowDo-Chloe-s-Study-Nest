@@ -1,26 +1,48 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { 
   Camera, 
   Lock, 
   MapPin, 
-  Bell, 
   Trophy, 
   Star, 
   Flame, 
   CheckCircle2,
-  Circle
+  Circle,
+  Loader2
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { usePageHeader } from '../../components/context/PageHeaderContext'; // 引入 Context
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  bio?: string | null;
+  location?: string | null;
+  avatarUrl?: string | null;
+  createdAt: string;
+  _count?: {
+    tasks: number;
+    categories: number;
+  };
+}
 
 export default function ProfileSettingsPage() {
+  const { setHeader } = usePageHeader();
+
+  // Loading & State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
   // 表單 State
-  const [displayName, setDisplayName] = useState('Chloe');
-  const [email] = useState('chloe.study@gmail.com');
-  const [bio, setBio] = useState('Keep learning, keep growing. 🌱\nSmall steps every day.');
-  const [location, setLocation] = useState('Taipei, Taiwan');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [bio, setBio] = useState('');
+  const [location, setLocation] = useState('');
 
   // 第三方連結 State
   const [accounts, setAccounts] = useState({
@@ -29,90 +51,199 @@ export default function ProfileSettingsPage() {
     line: false,
   });
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+  // 1. 設定頁面動態 Header 並 Fetch Profile Data
+  useEffect(() => {
+    // 設定全域 Header 標題與副標題
+    setHeader({
+      title: 'Personal Information 🐾',
+      subtitle: 'Manage your profile and account settings.',
+    });
+
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/api/user/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const result = await res.json();
+
+        if (res.ok && result.success) {
+          const data: UserProfile = result.data;
+          setProfile(data);
+          setDisplayName(data.name || '');
+          setEmail(data.email || '');
+          setBio(data.bio || '');
+          setLocation(data.location || '');
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [setHeader, API_URL]);
+
   const toggleAccount = (provider: keyof typeof accounts) => {
     setAccounts((prev) => ({ ...prev, [provider]: !prev[provider] }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert('Profile updated successfully! 🐾');
+  // 2. 處理頭像更換 ( Base64 上傳並通知 Header 同步)
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File size is too large! Max 2MB allowed. 🐾');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async () => {
+      const base64String = reader.result as string;
+
+      // 即時預覽
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: base64String } : null));
+
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/api/user/profile`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            avatarUrl: base64String,
+          }),
+        });
+
+        const result = await res.json();
+        if (res.ok && result.success) {
+          alert('Avatar updated successfully! 🐾');
+          // 關鍵：觸發全域事件，讓右上角的全域 Header 也能同步更換大頭照！
+          window.dispatchEvent(new Event('user-profile-updated'));
+        } else {
+          alert(result.message || 'Upload failed.');
+        }
+      } catch (err) {
+        console.error('Avatar upload error:', err);
+        alert('An error occurred while uploading. Please try again.');
+      }
+    };
   };
 
+  // 3. 處理個人資料更新
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/user/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: displayName,
+          bio,
+          location,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        alert('Profile updated successfully! 🐾');
+        setProfile((prev) => (prev ? { ...prev, name: displayName, bio, location } : null));
+        // 通知 Header 使用者名稱已更換
+        window.dispatchEvent(new Event('user-profile-updated'));
+      } else {
+        alert(result.message || 'Failed to update profile.');
+      }
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      alert('An error occurred. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const formattedMemberSince = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : 'May 12, 2024';
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FAF7F2]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#E89874]" />
+      </div>
+    );
+  }
+
   return (
-    <div className="relative w-full min-h-screen bg-[#FAF7F2] p-6 md:p-8 font-sans">
+    // 上方加上 pt-20，留出空間給全域 Header 浮動置頂
+    <div className="relative w-full min-h-screen bg-[#FAF7F2] p-6 md:p-8 pt-20 md:pt-24 font-sans">
       <div className="max-w-[1280px] mx-auto space-y-6">
         
-        {/* 頂部 Header 區塊 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-[#3D2C2E] flex items-center gap-2">
-              Personal Information <span className="text-xl">🐾</span>
-            </h1>
-            <p className="text-xs md:text-sm font-bold text-[#8C7A6B] mt-1">
-              Manage your profile and account settings.
-            </p>
-          </div>
-
-          {/* 右上角工具列 */}
-          <div className="flex items-center gap-3">
-            <button 
-              type="button" 
-              className="p-2.5 rounded-2xl bg-[#FFFDF9] border border-[#EADBC8] text-[#6C5B52] hover:bg-white transition-all relative shadow-xs cursor-pointer"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-[#E07A5F] rounded-full" />
-            </button>
-            <div className="relative w-10 h-10 rounded-2xl bg-[#F4E2D8] border-2 border-[#EADBC8] overflow-hidden shadow-xs cursor-pointer">
-              <Image
-                src="/ChatGPT Image 2026年8月23日 上午02_55_23.png"
-                alt="User Avatar"
-                fill
-                className="object-cover"
-              />
-            </div>
-          </div>
-        </div>
-
         {/* 主內容 layout (兩欄式) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           
           {/* 左側：Profile Information (佔 2 欄) */}
-          <div className="lg:col-span-2 bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 md:p-8 shadow-sm">
+          <div className="lg:col-span-2 bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 md:p-8 shadow-xs">
             <h2 className="text-lg font-black text-[#3D2C2E] mb-6">Profile Information</h2>
 
             <form onSubmit={handleSave} className="space-y-6">
               {/* 頭像區域 */}
-<div className="flex flex-col items-center sm:items-start gap-3">
-  {/* 外層相對定位容器（移除 overflow-hidden） */}
-  <div className="relative w-32 h-32">
-    
-    {/* 圓形頭像框（保留 overflow-hidden 專門裁切圖片） */}
-    <div className="w-full h-full rounded-full border-4 border-[#FDF3E7] shadow-inner bg-[#F4E2D8] overflow-hidden relative">
-      <Image
-        src="/ChatGPT Image 2026年8月23日 上午02_55_23.png"
-        alt="Profile Avatar"
-        fill
-        className="object-cover"
-        priority
-      />
-    </div>
-    
-    {/* 相機上傳按鈕（放在外層容器的右下角，不會被 overflow-hidden 裁切） */}
-    <label 
-      htmlFor="avatar-upload" 
-      className="absolute bottom-0 right-0 z-10 p-2.5 rounded-full bg-[#FFFDF9] border border-[#EADBC8] text-[#6C5B52] hover:bg-[#FDF3E7] shadow-md cursor-pointer transition-transform active:scale-95"
-    >
-      <Camera className="w-4 h-4 text-[#8C7A6B]" />
-      <input id="avatar-upload" type="file" accept="image/*" className="hidden" />
-    </label>
-    
-  </div>
+              <div className="flex flex-col items-center sm:items-start gap-3">
+                <div className="relative w-32 h-32">
+                  <div className="w-full h-full rounded-full border-4 border-[#FDF3E7] shadow-inner bg-[#F4E2D8] overflow-hidden relative flex items-center justify-center text-4xl font-black text-[#E89874]">
+                    {profile?.avatarUrl ? (
+                      <Image
+                        src={profile.avatarUrl}
+                        alt="Profile Avatar"
+                        fill
+                        className="object-cover"
+                        priority
+                        unoptimized
+                      />
+                    ) : (
+                      displayName[0]?.toUpperCase() || '🐱'
+                    )}
+                  </div>
+                  
+                  <label 
+                    htmlFor="avatar-upload" 
+                    className="absolute bottom-0 right-0 z-10 p-2.5 rounded-full bg-[#FFFDF9] border border-[#EADBC8] text-[#6C5B52] hover:bg-[#FDF3E7] shadow-md cursor-pointer transition-transform active:scale-95"
+                  >
+                    <Camera className="w-4 h-4 text-[#8C7A6B]" />
+                    <input 
+                      id="avatar-upload" 
+                      type="file" 
+                      accept="image/*"
+                      className="hidden" 
+                      onChange={handleAvatarChange}
+                    />
+                  </label>
+                </div>
 
-  <div className="text-center sm:text-left">
-    <p className="text-xs font-bold text-[#6C5B52]">Change Avatar</p>
-    <p className="text-[11px] font-medium text-[#A08D80] mt-0.5">JPG, PNG or GIF. Max 2MB</p>
-  </div>
-</div>
+                <div className="text-center sm:text-left">
+                  <p className="text-xs font-bold text-[#6C5B52]">Change Avatar</p>
+                  <p className="text-[11px] font-medium text-[#A08D80] mt-0.5">JPG, PNG or GIF. Max 2MB</p>
+                </div>
+              </div>
 
               {/* Display Name */}
               <div>
@@ -186,10 +317,18 @@ export default function ProfileSettingsPage() {
                 <Button
                   type="submit"
                   variant="primary"
-                  className="bg-[#E89874] hover:bg-[#d88763] text-white border-none shadow-xs text-xs font-extrabold py-3 px-6 rounded-2xl"
-                  rightIcon={<span className="text-sm">🐾</span>}
+                  disabled={isSaving}
+                  className="bg-[#E89874] hover:bg-[#d88763] text-white border-none shadow-xs text-xs font-extrabold py-3 px-6 rounded-2xl flex items-center gap-2 cursor-pointer"
                 >
-                  Save Changes
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      Save Changes <span>🐾</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </form>
@@ -199,49 +338,48 @@ export default function ProfileSettingsPage() {
           <div className="space-y-6">
             
             {/* Account Summary 卡片 */}
-            <div className="bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-sm">
+            <div className="bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-xs">
               <h2 className="text-lg font-black text-[#3D2C2E] mb-4">Account Summary</h2>
               
               <div className="divide-y divide-[#F2E8DC]">
-                {/* Member since */}
                 <div className="flex items-center gap-3 py-3.5 first:pt-0">
-                  <div className="relative w-10 h-10 rounded-2xl bg-[#FDF3E7] border border-[#EADBC8] overflow-hidden shrink-0">
-                    <Image
-                      src="/ChatGPT Image 2026年8月23日 上午02_55_23.png"
-                      alt="Member Avatar"
-                      fill
-                      className="object-cover"
-                    />
+                  <div className="relative w-10 h-10 rounded-2xl bg-[#FDF3E7] border border-[#EADBC8] overflow-hidden shrink-0 flex items-center justify-center font-extrabold text-[#E89874] text-sm">
+                    {profile?.avatarUrl ? (
+                      <Image src={profile.avatarUrl} alt="Avatar" fill className="object-cover" />
+                    ) : (
+                      profile?.name?.[0]?.toUpperCase() || '🐱'
+                    )}
                   </div>
                   <div>
                     <p className="text-[11px] font-bold text-[#8C7A6B]">Member since</p>
-                    <p className="text-xs font-extrabold text-[#3D2C2E]">May 12, 2024</p>
+                    <p className="text-xs font-extrabold text-[#3D2C2E]">{formattedMemberSince}</p>
                   </div>
                 </div>
 
-                {/* Level */}
                 <div className="flex items-center gap-3 py-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-[#FDF3E7] border border-[#EADBC8] flex items-center justify-center text-amber-600">
+                  <div className="w-10 h-10 rounded-2xl bg-[#FDF3E7] border border-[#EADBC8] flex items-center justify-center">
                     <Trophy className="w-5 h-5 text-[#E07A5F]" />
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-[#8C7A6B]">Level</p>
-                    <p className="text-xs font-extrabold text-[#3D2C2E]">Level 8</p>
+                    <p className="text-[11px] font-bold text-[#8C7A6B]">Total Tasks</p>
+                    <p className="text-xs font-extrabold text-[#3D2C2E]">
+                      {profile?._count?.tasks ?? 0} Tasks
+                    </p>
                   </div>
                 </div>
 
-                {/* Total XP */}
                 <div className="flex items-center gap-3 py-3.5">
                   <div className="w-10 h-10 rounded-2xl bg-[#FDF3E7] border border-[#EADBC8] flex items-center justify-center">
                     <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-[#8C7A6B]">Total XP</p>
-                    <p className="text-xs font-extrabold text-[#3D2C2E]">3,240 XP</p>
+                    <p className="text-[11px] font-bold text-[#8C7A6B]">Categories Created</p>
+                    <p className="text-xs font-extrabold text-[#3D2C2E]">
+                      {profile?._count?.categories ?? 0} Categories
+                    </p>
                   </div>
                 </div>
 
-                {/* Current Streak */}
                 <div className="flex items-center gap-3 py-3.5 last:pb-0">
                   <div className="w-10 h-10 rounded-2xl bg-[#FDF3E7] border border-[#EADBC8] flex items-center justify-center">
                     <Flame className="w-5 h-5 text-orange-500 fill-orange-500" />
@@ -255,7 +393,7 @@ export default function ProfileSettingsPage() {
             </div>
 
             {/* Connected Accounts 卡片 */}
-            <div className="bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-sm">
+            <div className="bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-xs">
               <h2 className="text-lg font-black text-[#3D2C2E] mb-4">Connected Accounts</h2>
 
               <div className="space-y-4">
@@ -285,7 +423,7 @@ export default function ProfileSettingsPage() {
                           variant="secondary"
                           size="sm"
                           onClick={() => toggleAccount('google')}
-                          className="text-[11px] font-bold text-[#6C5B52] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl"
+                          className="text-[11px] font-bold text-[#6C5B52] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl cursor-pointer"
                         >
                           Disconnect
                         </Button>
@@ -299,7 +437,7 @@ export default function ProfileSettingsPage() {
                           variant="secondary"
                           size="sm"
                           onClick={() => toggleAccount('google')}
-                          className="text-[11px] font-bold text-[#3D2C2E] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl"
+                          className="text-[11px] font-bold text-[#3D2C2E] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl cursor-pointer"
                         >
                           Connect
                         </Button>
@@ -331,7 +469,7 @@ export default function ProfileSettingsPage() {
                           variant="secondary"
                           size="sm"
                           onClick={() => toggleAccount('apple')}
-                          className="text-[11px] font-bold text-[#6C5B52] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl"
+                          className="text-[11px] font-bold text-[#6C5B52] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl cursor-pointer"
                         >
                           Disconnect
                         </Button>
@@ -345,7 +483,7 @@ export default function ProfileSettingsPage() {
                           variant="secondary"
                           size="sm"
                           onClick={() => toggleAccount('apple')}
-                          className="text-[11px] font-bold text-[#3D2C2E] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl"
+                          className="text-[11px] font-bold text-[#3D2C2E] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl cursor-pointer"
                         >
                           Connect
                         </Button>
@@ -375,7 +513,7 @@ export default function ProfileSettingsPage() {
                           variant="secondary"
                           size="sm"
                           onClick={() => toggleAccount('line')}
-                          className="text-[11px] font-bold text-[#6C5B52] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl"
+                          className="text-[11px] font-bold text-[#6C5B52] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl cursor-pointer"
                         >
                           Disconnect
                         </Button>
@@ -389,7 +527,7 @@ export default function ProfileSettingsPage() {
                           variant="secondary"
                           size="sm"
                           onClick={() => toggleAccount('line')}
-                          className="text-[11px] font-bold text-[#3D2C2E] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl"
+                          className="text-[11px] font-bold text-[#3D2C2E] bg-[#FAF6F0] border-[#EADBC8] hover:bg-[#EADBC8] py-1 px-3 rounded-xl cursor-pointer"
                         >
                           Connect
                         </Button>
