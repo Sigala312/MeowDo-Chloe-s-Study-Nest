@@ -1,82 +1,196 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Calendar, Clock, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, Clock, Plus, Loader2 } from 'lucide-react';
 import { CreateCategoryModal } from './CreateCategoryModal';
 import { AddTagModal } from './AddTagModal';
-import { Button } from '../ui/Button'; 
+import { Button } from '../ui/Button';
 
-interface Category {
+export interface Category {
   id: string;
   name: string;
   icon?: string | null;
   color?: string | null;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+}
+
 interface AddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (task: any) => void;
+  onTaskAdded?: () => void;
 }
 
 export const AddTaskModal: React.FC<AddTaskModalProps> = ({
   isOpen,
   onClose,
-  onAddTask,
+  onTaskAdded,
 }) => {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+  // 取得今天的預設 YYYY-MM-DD
+  const getTodayDateString = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  // 表單 State
   const [taskName, setTaskName] = useState('');
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Study', icon: '📖' },
-    { id: '2', name: 'Health', icon: '🦾' },
-    { id: '3', name: 'Coding', icon: '💻' },
-    { id: '4', name: 'Life', icon: '🏠' },
-  ]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('Study');
-  const [tags, setTags] = useState<string[]>(['#React', '#Frontend']);
-  const [dueDate, setDueDate] = useState('2026-05-19');
-  const [dueTime, setDueTime] = useState('10:00 AM');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([]);
+  const [dueDate, setDueDate] = useState(getTodayDateString());
+  const [dueTime, setDueTime] = useState('10:00');
+
+  // API 資料 State
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 控制子彈窗開關
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
 
-  if (!isOpen) return null;
-
-  const handleCreateCategory = (newCat: { name: string; icon: string }) => {
-    const categoryItem = { id: Date.now().toString(), ...newCat };
-    setCategories((prev) => [...prev, categoryItem]);
-    setSelectedCategory(newCat.name);
-  };
-
-  const handleAddTag = (newTag: string) => {
-    if (!tags.includes(newTag)) {
-      setTags((prev) => [...prev, newTag]);
+  // 重置表單
+  const resetForm = () => {
+    setTaskName('');
+    setSelectedTagNames([]);
+    setDueDate(getTodayDateString());
+    setDueTime('10:00');
+    if (categories.length > 0) {
+      setSelectedCategoryId(categories[0].id);
+    } else {
+      setSelectedCategoryId('');
     }
   };
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags((prev) => prev.filter((t) => t !== tagToRemove));
+  // 1. 開啟 Modal 時，向後端撈取 Categories 與 Tags 列表
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchData = async () => {
+      setIsLoadingData(true);
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
+
+        // 平行向 API 發送 GET 請求
+        const [catRes, tagRes] = await Promise.all([
+          fetch(`${API_URL}/api/category`, { headers }),
+          fetch(`${API_URL}/api/tag`, { headers }),
+        ]);
+
+        const catResult = await catRes.json();
+        const tagResult = await tagRes.json();
+
+        // 設定 Categories
+        if (catRes.ok && catResult.success) {
+          const catList: Category[] = catResult.data;
+          setCategories(catList);
+          if (catList.length > 0 && !selectedCategoryId) {
+            setSelectedCategoryId(catList[0].id);
+          }
+        }
+
+        // 設定 Tags
+        if (tagRes.ok && tagResult.success) {
+          setAvailableTags(tagResult.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch initial modal data:', err);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, [isOpen, API_URL]);
+
+  if (!isOpen) return null;
+
+  // 2. Category 建立後的回呼
+  const handleCategoryCreated = (newCat: Category) => {
+    setCategories((prev) => [...prev, newCat]);
+    setSelectedCategoryId(newCat.id);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // 3. Tag 建立後的回呼
+  const handleTagCreated = (newTag: Tag) => {
+    setAvailableTags((prev) => [...prev, newTag]);
+    if (!selectedTagNames.includes(newTag.name)) {
+      setSelectedTagNames((prev) => [...prev, newTag.name]);
+    }
+  };
+
+  // 標籤切換/移除選擇
+  const handleToggleTag = (tagName: string) => {
+    setSelectedTagNames((prev) =>
+      prev.includes(tagName) ? prev.filter((t) => t !== tagName) : [...prev, tagName]
+    );
+  };
+
+  // 4. 提交 Task (正式串接 Task API)
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskName.trim()) return;
+    if (!taskName.trim()) {
+      alert('Please enter a task name!');
+      return;
+    }
 
-    onAddTask({
-      taskName,
-      category: selectedCategory,
-      tags,
-      dueDate,
-      dueTime,
-    });
+    setIsSubmitting(true);
 
-    onClose();
+    try {
+      const combinedDateTime = dueTime 
+        ? new Date(`${dueDate}T${dueTime}`).toISOString()
+        : new Date(dueDate).toISOString();
+
+      const payload = {
+        title: taskName.trim(),
+        categoryId: selectedCategoryId || undefined, // 避免傳送空字串，改傳 undefined 或不填
+        tags: selectedTagNames,
+        dueDate: combinedDateTime,
+      };
+
+      const token = localStorage.getItem('token');
+      // 如果你的后端端點是 /api/task，可修改為 `${API_URL}/api/task`
+      const res = await fetch(`${API_URL}/api/task`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || 'Failed to add task.');
+      }
+
+      // 成功後重置表單並關閉 Modal
+      resetForm();
+      onClose();
+
+      if (onTaskAdded) {
+        onTaskAdded();
+      }
+    } catch (err: any) {
+      console.error('Error creating task:', err);
+      alert(err.message || 'An error occurred while creating the task.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <>
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-xs p-4">
         <div className="w-full max-w-md bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-2xl relative animate-in fade-in zoom-in-95">
+          {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-black text-[#3D2C2E]">Add New Task</h2>
             <Button
@@ -92,7 +206,9 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Task Name */}
             <div>
-              <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">Task Name</label>
+              <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
+                Task Name
+              </label>
               <div className="relative">
                 <input
                   type="text"
@@ -107,23 +223,32 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
             {/* Category */}
             <div>
-              <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">Category</label>
-              <div className="flex flex-wrap gap-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat.name)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl border text-xs font-extrabold transition-all cursor-pointer ${
-                      selectedCategory === cat.name
-                        ? 'bg-[#FDF3E7] border-[#E89874] text-[#3D2C2E] shadow-xs'
-                        : 'bg-[#FAF6F0] border-[#EADBC8] text-[#6C5B52] hover:bg-[#F4E2D8]'
-                    }`}
-                  >
-                    <span>{cat.icon}</span>
-                    <span>{cat.name}</span>
-                  </button>
-                ))}
+              <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
+                Category
+              </label>
+              <div className="flex flex-wrap gap-2 items-center">
+                {isLoadingData ? (
+                  <div className="flex items-center gap-2 text-xs text-[#8C7A6B] py-1">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#E89874]" /> Loading...
+                  </div>
+                ) : (
+                  categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setSelectedCategoryId(cat.id)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl border text-xs font-extrabold transition-all cursor-pointer ${
+                        selectedCategoryId === cat.id
+                          ? 'bg-[#FDF3E7] border-[#E89874] text-[#3D2C2E] shadow-xs'
+                          : 'bg-[#FAF6F0] border-[#EADBC8] text-[#6C5B52] hover:bg-[#F4E2D8]'
+                      }`}
+                    >
+                      <span>{cat.icon || '📁'}</span>
+                      <span>{cat.name}</span>
+                    </button>
+                  ))
+                )}
+
                 <Button
                   type="button"
                   variant="outline"
@@ -140,18 +265,23 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             {/* Tags */}
             <div>
               <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">Tags</label>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
+              <div className="flex flex-wrap gap-2 items-center">
+                {selectedTagNames.map((tagName) => (
                   <span
-                    key={tag}
+                    key={tagName}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-[#FDF3E7] border border-[#E89874] text-xs font-extrabold text-[#3D2C2E]"
                   >
-                    {tag}
-                    <button type="button" onClick={() => handleRemoveTag(tag)} className="cursor-pointer">
+                    {tagName}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTag(tagName)}
+                      className="cursor-pointer"
+                    >
                       <X className="w-3 h-3 text-[#8C7A6B] hover:text-[#3D2C2E]" />
                     </button>
                   </span>
                 ))}
+
                 <Button
                   type="button"
                   variant="outline"
@@ -168,28 +298,32 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             {/* Date & Time */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">Due Date</label>
+                <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
+                  Due Date
+                </label>
                 <div className="relative">
                   <input
-                    type="text"
+                    type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none cursor-pointer"
                   />
-                  <Calendar className="w-4 h-4 text-[#8C7A6B] absolute left-3 top-3" />
+                  <Calendar className="w-4 h-4 text-[#8C7A6B] absolute left-3 top-3 pointer-events-none" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">Time (Optional)</label>
+                <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
+                  Time (Optional)
+                </label>
                 <div className="relative">
                   <input
-                    type="text"
+                    type="time"
                     value={dueTime}
                     onChange={(e) => setDueTime(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none cursor-pointer"
                   />
-                  <Clock className="w-4 h-4 text-[#8C7A6B] absolute left-3 top-3" />
+                  <Clock className="w-4 h-4 text-[#8C7A6B] absolute left-3 top-3 pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -201,6 +335,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                 variant="secondary"
                 fullWidth
                 onClick={onClose}
+                disabled={isSubmitting}
                 className="bg-[#FAF6F0] border-[#EADBC8] text-[#6C5B52] hover:bg-[#EADBC8] text-xs font-black py-3"
               >
                 Cancel
@@ -209,31 +344,36 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                 type="submit"
                 variant="primary"
                 fullWidth
-                className="bg-[#E89874] hover:bg-[#d88763] text-white border-none shadow-xs text-xs font-black py-3"
+                disabled={isSubmitting}
+                className="bg-[#E89874] hover:bg-[#d88763] text-white border-none shadow-xs text-xs font-black py-3 flex items-center justify-center gap-2"
               >
-                Add Task 🐾
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Adding...
+                  </>
+                ) : (
+                  <>
+                    Add Task 🐾
+                  </>
+                )}
               </Button>
             </div>
           </form>
         </div>
       </div>
 
-      {/* 巢狀彈窗 */}
-     <CreateCategoryModal
-  isOpen={isCategoryModalOpen}
-  onClose={() => setIsCategoryModalOpen(false)}
-  onSuccess={(newCat) => {
-    // 1. 新增到畫面的 categories 選項中
-    setCategories((prev) => [...prev, newCat]);
-    // 2. 自動選取剛建立好的分類
-    setSelectedCategory(newCat.name);
-  }}
-/>
+      {/* 巢狀彈窗：Category (打 API) */}
+      <CreateCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSuccess={handleCategoryCreated}
+      />
 
+      {/* 巢狀彈窗：Tag (打 API) */}
       <AddTagModal
         isOpen={isTagModalOpen}
         onClose={() => setIsTagModalOpen(false)}
-        onAddTag={handleAddTag}
+        onSuccess={handleTagCreated}
       />
     </>
   );

@@ -21,7 +21,7 @@ export const Sidebar: React.FC = () => {
 
   const menuItems = [
     { label: 'Home', icon: <Home className="w-5 h-5" />, href: '/Home' },
-    { label: 'Tasks', icon: <CheckSquare className="w-5 h-5" />, href: '/tasks' },
+    { label: 'Tasks', icon: <CheckSquare className="w-5 h-5" />, href: '/Home/tasks' },
     { label: 'Focus', icon: <Timer className="w-5 h-5" />, href: '/Home/focus' },
     { label: 'Roulette', icon: <Dices className="w-5 h-5" />, href: '/Home/roulette' },
     { label: 'Cat Corner', icon: <Cat className="w-5 h-5" />, href: '/cat-corner' },
