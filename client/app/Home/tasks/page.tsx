@@ -12,11 +12,15 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'Day' | 'Week' | 'Month'>('Month');
-  
-  // 修正：預設當前系統時間
+
+  // 當前日曆顯示的月份/年份基準 Date
   const [currentDate, setCurrentDate] = useState(new Date());
-  
-  // 配合簡化後的 TaskList 狀態：'All' | 'To Do' | 'Completed'
+
+  // 新增：目前被點選的具體日期（字串格式 YYYY-MM-DD，預設為今天）
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+
   const [filterStatus, setFilterStatus] = useState<'All' | 'To Do' | 'Completed'>('All');
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
 
@@ -67,6 +71,13 @@ export default function TasksPage() {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, isStarred: !t.isStarred } : t)));
   };
 
+  // 處理點擊 Today 鍵：重置 currentDate 與 selectedDateStr
+  const handleTodayClick = () => {
+    const today = new Date();
+    setCurrentDate(today);
+    setSelectedDateStr(today.toISOString().split('T')[0]);
+  };
+
   return (
     <div className="p-8 space-y-6 bg-[#FAF7F2] min-h-screen text-[#3D2C2E]">
       {/* Header */}
@@ -86,17 +97,24 @@ export default function TasksPage() {
             tasks={tasks}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
-            onPrevMonth={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
-            onNextMonth={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
-            onToday={() => setCurrentDate(new Date())}
+            onPrevMonth={() =>
+              setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+            }
+            onNextMonth={() =>
+              setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
+            }
+            onToday={handleTodayClick}
+            onDateSelect={setSelectedDateStr}
           />
         </div>
 
-        {/* 右側：任務清單 */}
+        {/* 右側：任務清單 (跟隨 viewMode 與 selectedDateStr 連動) */}
         <div className="lg:col-span-6">
           <TaskList
             tasks={tasks}
             isLoading={isLoading}
+            viewMode={viewMode}
+            selectedDateStr={selectedDateStr}
             filterStatus={filterStatus}
             onFilterChange={setFilterStatus}
             onToggleTask={handleToggleTask}
