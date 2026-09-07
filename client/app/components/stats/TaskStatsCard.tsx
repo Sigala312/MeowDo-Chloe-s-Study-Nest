@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Dispatch, SetStateAction } from 'react';
 import { ClipboardList, CheckCircle2, Circle, AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -21,49 +21,59 @@ interface DailyStat {
   rate: number;
 }
 
-export const TaskStatsCard: React.FC = () => {
-  const [period, setPeriod] = useState<'Year' | 'Month' | 'Week' | 'Day'>('Month');
+export interface TaskStatsCardProps {
+  period?: 'Year' | 'Month' | 'Week' | 'Day';
+  setPeriod?: Dispatch<SetStateAction<'Year' | 'Month' | 'Week' | 'Day'>>;
+  currentDate?: Date;
+  setCurrentDate?: Dispatch<SetStateAction<Date>>;
+}
+
+export const TaskStatsCard: React.FC<TaskStatsCardProps> = ({
+  period = 'Month',
+  setPeriod,
+  currentDate = new Date(),
+  setCurrentDate,
+}) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
-  // 1. 帶上 Auth Token 向 /api/task 發送請求
+  // 安全的時間轉換
+  const safeDate = useMemo(() => {
+    return currentDate instanceof Date && !isNaN(currentDate.getTime()) ? currentDate : new Date();
+  }, [currentDate]);
+
   useEffect(() => {
     const fetchTasks = async () => {
       try {
         setIsLoading(true);
         const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const isValidToken = token && /^[\x00-\xFF]*$/.test(token);
 
         const res = await fetch(`${API_URL}/api/task`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(isValidToken ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
 
-        if (res.status === 401) {
-          throw new Error('Unauthorized: 尚未登入或 Token 已過期');
-        }
-
+        if (res.status === 401) throw new Error('Unauthorized');
         if (!res.ok) throw new Error('Failed to fetch tasks');
         
         const data = await res.json();
 
-        // 核心修復：防禦性檢查，確保寫入 state 的必定是 Array
         if (Array.isArray(data)) {
           setTasks(data);
         } else if (Array.isArray(data.tasks)) {
-          setTasks(data.tasks); // 相容 { tasks: [...] }
+          setTasks(data.tasks);
         } else if (Array.isArray(data.data)) {
-          setTasks(data.data);   // 相容 { data: [...] }
+          setTasks(data.data);
         } else {
-          console.error('API 回傳格式非陣列:', data);
-          setTasks([]);          // 若格式不符，預設給空陣列避免壞頁
+          setTasks([]);
         }
       } catch (err) {
         console.error('Error fetching task stats:', err);
-        setTasks([]);            // 發生錯誤時設為空陣列
+        setTasks([]);
       } finally {
         setIsLoading(false);
       }
@@ -72,9 +82,19 @@ export const TaskStatsCard: React.FC = () => {
     fetchTasks();
   }, []);
 
-  // 2. 切換上一頁/下一頁時間範圍
+  // 安全的 Period 切換處理
+  const handlePeriodChange = (newPeriod: 'Year' | 'Month' | 'Week' | 'Day') => {
+    if (typeof setPeriod === 'function') {
+      setPeriod(newPeriod);
+    } else {
+      console.warn('TaskStatsCard: setPeriod prop is not provided or not a function');
+    }
+  };
+
+  // 安全的時間切換處理
   const handlePrev = () => {
-    const next = new Date(currentDate);
+    if (typeof setCurrentDate !== 'function') return;
+    const next = new Date(safeDate);
     if (period === 'Year') next.setFullYear(next.getFullYear() - 1);
     else if (period === 'Month') next.setMonth(next.getMonth() - 1);
     else if (period === 'Week') next.setDate(next.getDate() - 7);
@@ -83,7 +103,8 @@ export const TaskStatsCard: React.FC = () => {
   };
 
   const handleNext = () => {
-    const next = new Date(currentDate);
+    if (typeof setCurrentDate !== 'function') return;
+    const next = new Date(safeDate);
     if (period === 'Year') next.setFullYear(next.getFullYear() + 1);
     else if (period === 'Month') next.setMonth(next.getMonth() + 1);
     else if (period === 'Week') next.setDate(next.getDate() + 7);
@@ -91,16 +112,15 @@ export const TaskStatsCard: React.FC = () => {
     setCurrentDate(next);
   };
 
-  // 3. 依據時間顆粒計算過濾範圍與標題
   const dateRangeLabel = useMemo(() => {
-    const y = currentDate.getFullYear();
-    const m = currentDate.toLocaleString('en-US', { month: 'long' });
-    const d = currentDate.getDate();
+    const y = safeDate.getFullYear();
+    const m = safeDate.toLocaleString('en-US', { month: 'long' });
+    const d = safeDate.getDate();
 
     if (period === 'Year') return `${y}`;
     if (period === 'Month') return `${m} ${y}`;
     if (period === 'Week') {
-      const start = new Date(currentDate);
+      const start = new Date(safeDate);
       const day = start.getDay();
       const diffToMon = (day + 6) % 7;
       start.setDate(start.getDate() - diffToMon);
@@ -112,27 +132,27 @@ export const TaskStatsCard: React.FC = () => {
       return `${sMonth} ${start.getDate()} - ${eMonth} ${end.getDate()}, ${y}`;
     }
     return `${m} ${d}, ${y}`;
-  }, [currentDate, period]);
+  }, [safeDate, period]);
 
-  // 4. 計算統計數據 (4格概覽 + 日期明細)
   const { filteredTasks, dailyStats, overview } = useMemo(() => {
     const now = new Date();
 
     const filtered = tasks.filter((task) => {
       if (!task.dueDate) return false;
       const tDate = new Date(task.dueDate);
+      if (isNaN(tDate.getTime())) return false;
 
       if (period === 'Year') {
-        return tDate.getFullYear() === currentDate.getFullYear();
+        return tDate.getFullYear() === safeDate.getFullYear();
       }
       if (period === 'Month') {
         return (
-          tDate.getFullYear() === currentDate.getFullYear() &&
-          tDate.getMonth() === currentDate.getMonth()
+          tDate.getFullYear() === safeDate.getFullYear() &&
+          tDate.getMonth() === safeDate.getMonth()
         );
       }
       if (period === 'Week') {
-        const start = new Date(currentDate);
+        const start = new Date(safeDate);
         const day = start.getDay();
         const diffToMon = (day + 6) % 7;
         start.setDate(start.getDate() - diffToMon);
@@ -145,9 +165,9 @@ export const TaskStatsCard: React.FC = () => {
         return tDate >= start && tDate <= end;
       }
       return (
-        tDate.getFullYear() === currentDate.getFullYear() &&
-        tDate.getMonth() === currentDate.getMonth() &&
-        tDate.getDate() === currentDate.getDate()
+        tDate.getFullYear() === safeDate.getFullYear() &&
+        tDate.getMonth() === safeDate.getMonth() &&
+        tDate.getDate() === safeDate.getDate()
       );
     });
 
@@ -217,24 +237,24 @@ export const TaskStatsCard: React.FC = () => {
         total: filtered.length,
       },
     };
-  }, [tasks, period, currentDate]);
+  }, [tasks, period, safeDate]);
+
+  const mascotImgPath = encodeURI('/螢幕擷取畫面_2026-09-04_153513-removebg-preview.png');
 
   return (
     <div className="bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-sm space-y-6">
-      {/* Title */}
       <div className="flex items-center gap-2">
         <ClipboardList className="w-5 h-5 text-[#E07A5F]" />
         <h2 className="text-lg font-black text-[#3D2C2E]">Task Statistics</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-        {/* 左側：統計開關 & 數據小卡 */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-[#FAF6F0] p-1 rounded-2xl border border-[#EADBC8] flex items-center justify-between">
             {(['Year', 'Month', 'Week', 'Day'] as const).map((p) => (
               <button
                 key={p}
-                onClick={() => setPeriod(p)}
+                onClick={() => handlePeriodChange(p)}
                 className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
                   period === p
                     ? 'bg-[#FCE3D7] text-[#E07A5F] shadow-xs'
@@ -297,7 +317,6 @@ export const TaskStatsCard: React.FC = () => {
           </div>
         </div>
 
-        {/* 中間：表格明細 */}
         <div className="lg:col-span-5 bg-[#FAF6F0]/60 border border-[#EADBC8] rounded-2xl p-4 text-xs font-bold space-y-3 min-h-[220px] flex flex-col justify-between">
           <div className="space-y-3">
             <div className="grid grid-cols-4 text-[#8C7A6B] pb-2 border-b border-[#EADBC8]">
@@ -342,13 +361,12 @@ export const TaskStatsCard: React.FC = () => {
           )}
         </div>
 
-        {/* 右側：吉祥物 */}
         <div className="lg:col-span-2 flex flex-col items-center justify-center relative pt-2">
           <div className="bg-[#FAF6F0] border border-[#EADBC8] rounded-2xl px-3 py-1.5 text-[11px] font-black text-[#3D2C2E] shadow-xs mb-1 relative z-10">
             Good job! Keep going! ❤️
           </div>
           <img
-            src="/螢幕擷取畫面_2026-09-04_153513-removebg-preview.png"
+            src={mascotImgPath}
             alt="Mascot Cat"
             className="w-32 h-auto object-contain select-none"
           />

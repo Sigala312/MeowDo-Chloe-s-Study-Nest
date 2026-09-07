@@ -97,7 +97,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
         // 設定 Tags
         if (tagRes.ok && tagResult.success) {
-          setAvailableTags(tagResult.data);
+          setAvailableTags(tagResult.data || []);
         }
       } catch (err) {
         console.error('Failed to fetch initial modal data:', err);
@@ -132,7 +132,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     );
   };
 
-  // 4. 提交 Task (正式串接 Task API)
+  // 4. 提交 Task
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskName.trim()) {
@@ -149,13 +149,12 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
       const payload = {
         title: taskName.trim(),
-        categoryId: selectedCategoryId || undefined, // 避免傳送空字串，改傳 undefined 或不填
+        categoryId: selectedCategoryId || undefined,
         tags: selectedTagNames,
         dueDate: combinedDateTime,
       };
 
       const token = localStorage.getItem('token');
-      // 如果你的后端端點是 /api/task，可修改為 `${API_URL}/api/task`
       const res = await fetch(`${API_URL}/api/task`, {
         method: 'POST',
         headers: {
@@ -171,7 +170,6 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
         throw new Error(result.message || 'Failed to add task.');
       }
 
-      // 成功後重置表單並關閉 Modal
       resetForm();
       onClose();
 
@@ -266,21 +264,30 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             <div>
               <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">Tags</label>
               <div className="flex flex-wrap gap-2 items-center">
-                {selectedTagNames.map((tagName) => (
-                  <span
-                    key={tagName}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-[#FDF3E7] border border-[#E89874] text-xs font-extrabold text-[#3D2C2E]"
-                  >
-                    {tagName}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleTag(tagName)}
-                      className="cursor-pointer"
-                    >
-                      <X className="w-3 h-3 text-[#8C7A6B] hover:text-[#3D2C2E]" />
-                    </button>
-                  </span>
-                ))}
+                {isLoadingData ? (
+                  <div className="flex items-center gap-2 text-xs text-[#8C7A6B] py-1">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#E89874]" /> Loading...
+                  </div>
+                ) : (
+                  availableTags.map((tag) => {
+                    const isSelected = selectedTagNames.includes(tag.name);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => handleToggleTag(tag.name)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-extrabold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#FDF3E7] border-[#E89874] text-[#3D2C2E] shadow-xs'
+                            : 'bg-[#FAF6F0] border-[#EADBC8] text-[#6C5B52] hover:bg-[#F4E2D8]'
+                        }`}
+                      >
+                        <span>#{tag.name}</span>
+                        {isSelected && <X className="w-3 h-3 text-[#E89874]" />}
+                      </button>
+                    );
+                  })
+                )}
 
                 <Button
                   type="button"
@@ -301,14 +308,15 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                 <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
                   Due Date
                 </label>
-                <div className="relative">
+                <div className="relative flex items-center">
+                  <Calendar className="w-4 h-4 text-[#8C7A6B] absolute left-3 z-10 pointer-events-none" />
                   <input
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none cursor-pointer"
+                    onClick={(e) => e.currentTarget.showPicker?.()}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none cursor-pointer focus:border-[#E07A5F]"
                   />
-                  <Calendar className="w-4 h-4 text-[#8C7A6B] absolute left-3 top-3 pointer-events-none" />
                 </div>
               </div>
 
@@ -316,14 +324,15 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                 <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
                   Time (Optional)
                 </label>
-                <div className="relative">
+                <div className="relative flex items-center">
+                  <Clock className="w-4 h-4 text-[#8C7A6B] absolute left-3 z-10 pointer-events-none" />
                   <input
                     type="time"
                     value={dueTime}
                     onChange={(e) => setDueTime(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none cursor-pointer"
+                    onClick={(e) => e.currentTarget.showPicker?.()}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none cursor-pointer focus:border-[#E07A5F]"
                   />
-                  <Clock className="w-4 h-4 text-[#8C7A6B] absolute left-3 top-3 pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -362,14 +371,14 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
         </div>
       </div>
 
-      {/* 巢狀彈窗：Category (打 API) */}
+      {/* 巢狀彈窗：Category */}
       <CreateCategoryModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         onSuccess={handleCategoryCreated}
       />
 
-      {/* 巢狀彈窗：Tag (打 API) */}
+      {/* 巢狀彈窗：Tag */}
       <AddTagModal
         isOpen={isTagModalOpen}
         onClose={() => setIsTagModalOpen(false)}

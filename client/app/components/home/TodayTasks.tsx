@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { LinearProgress } from '../ui/Progress';
@@ -23,12 +24,27 @@ export const TodayTasks: React.FC = () => {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
 
-  // 1. 從後端抓取 Task 列表
+  // 日期比對輔助函式：判斷 Date 是否為今天
+  const isSameDay = (dateStr?: string | Date) => {
+    if (!dateStr) return false;
+    const taskDate = new Date(dateStr);
+    const today = new Date();
+    return (
+      taskDate.getFullYear() === today.getFullYear() &&
+      taskDate.getMonth() === today.getMonth() &&
+      taskDate.getDate() === today.getDate()
+    );
+  };
+
+  // 1. 從後端抓取當天 Task 列表
   const fetchTodayTasks = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API_URL}/api/task`, {
+      const todayISO = new Date().toISOString().split('T')[0];
+
+      // 帶上 date 參數，讓後端只抓取當日任務
+      const res = await fetch(`${API_URL}/api/task?date=${todayISO}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -37,11 +53,18 @@ export const TodayTasks: React.FC = () => {
       const result = await res.json();
 
       if (res.ok && result.success) {
-        // 將後端 Task 資料轉換為前端 TaskItem 所需格式
-        const mappedTasks: TaskItemProps[] = result.data.map((task: any) => ({
+        // 過濾僅保留 dueDate 為今天的 Task（若後端未支援 query parameter，前端做二次過濾）
+        const todayTasksList = result.data.filter((task: any) =>
+          task.dueDate ? isSameDay(task.dueDate) : true
+        );
+
+        const mappedTasks: TaskItemProps[] = todayTasksList.map((task: any) => ({
           id: task.id,
           title: task.title,
           category: task.category?.name || 'General',
+          tags: Array.isArray(task.tags)
+            ? task.tags.map((tag: any) => (typeof tag === 'string' ? tag : tag.name))
+            : [],
           completed: task.isCompleted ?? task.completed ?? false,
           icon: task.category?.icon || '🐾',
           iconBg: 'bg-[#FAF0E6]',
@@ -62,7 +85,7 @@ export const TodayTasks: React.FC = () => {
     fetchTodayTasks();
   }, [fetchTodayTasks]);
 
-  // 2. 切換 Task 完成狀態 (PATCH /api/task/:id 或 PUT)
+  // 2. 切換 Task 完成狀態
   const toggleTask = async (id: string) => {
     const targetTask = tasks.find((t) => t.id === id);
     if (!targetTask) return;
@@ -78,6 +101,7 @@ export const TodayTasks: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
+
       const res = await fetch(`${API_URL}/api/task/${id}`, {
         method: 'PATCH',
         headers: {
@@ -87,18 +111,24 @@ export const TodayTasks: React.FC = () => {
         body: JSON.stringify({ isCompleted: nextCompletedState }),
       });
 
-      if (!res.ok) {
-        // 若 API 失敗，還原前端 State
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        if (nextCompletedState) {
+          window.dispatchEvent(new Event('cat-food-updated'));
+          window.dispatchEvent(new Event('tomatoes-updated'));
+        }
+      } else {
+        // 若 API 回傳失敗，還原前端 State
         setTasks((prev) =>
           prev.map((task) =>
             task.id === id ? { ...task, completed: targetTask.completed } : task
           )
         );
-        console.error('Failed to update task status');
+        console.error('Failed to update task status:', result.error);
       }
     } catch (err) {
       console.error('Error toggling task:', err);
-      // 還原前端 State
       setTasks((prev) =>
         prev.map((task) =>
           task.id === id ? { ...task, completed: targetTask.completed } : task
@@ -107,16 +137,15 @@ export const TodayTasks: React.FC = () => {
     }
   };
 
-  // 3. 計算完成任務數量與番茄總數
+  // 3. 計算完成任務數量與罐頭總數
   const completedCount = tasks.filter((t) => t.completed).length;
   const totalTasks = tasks.length;
   const completionPercentage =
     totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
 
-  // 番茄計算規則：1 個任務 = 1 個番茄，完成滿 7 個任務額外 +3 個番茄
-  const basePomodoros = completedCount;
-  const bonusPomodoros = completedCount >= 7 ? 3 : 0;
-  const totalPomodorosEarned = basePomodoros + bonusPomodoros;
+  const baseCatFood = completedCount;
+  const bonusCatFood = completedCount >= 7 ? 3 : 0;
+  const totalCatFoodEarned = baseCatFood + bonusCatFood;
 
   return (
     <>
@@ -155,16 +184,16 @@ export const TodayTasks: React.FC = () => {
             </span>
           </div>
 
-          {/* 今日番茄計數獎勵卡片 */}
+          {/* 今日貓罐頭計數獎勵卡片 */}
           <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#FFF9F3] border border-[#F5E6D8]">
             <div className="flex items-center gap-2.5">
-              <span className="text-2xl">🍅</span>
+              <span className="text-2xl select-none">🥫</span>
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-black text-[#3D2C2E]">
-                    Earned {totalPomodorosEarned} Pomodoros
+                    Earned {totalCatFoodEarned} Cat Foods
                   </span>
-                  {bonusPomodoros > 0 && (
+                  {bonusCatFood > 0 && (
                     <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#E89874] text-white">
                       <Sparkles className="w-3 h-3" /> +3 Bonus!
                     </span>
@@ -172,8 +201,8 @@ export const TodayTasks: React.FC = () => {
                 </div>
                 <p className="text-[11px] font-bold text-[#A08D80]">
                   {completedCount >= 7
-                    ? 'Goal reached! Extra 3 tomatoes unlocked 🎉'
-                    : `Complete ${7 - completedCount} more tasks to get +3 bonus tomatoes!`}
+                    ? 'Goal reached! Extra 3 cat foods unlocked 🎉'
+                    : `Complete ${7 - completedCount} more tasks to get +3 bonus cat foods!`}
                 </p>
               </div>
             </div>
@@ -201,14 +230,14 @@ export const TodayTasks: React.FC = () => {
           </div>
         </div>
 
-        {/* Footer Link */}
+        {/* Footer Link - 跳轉至 /Home/tasks */}
         <div className="pt-4 text-center">
-          <button
-            type="button"
+          <Link
+            href="/Home/tasks"
             className="inline-flex items-center gap-1.5 text-sm font-bold text-[#8C7A6B] hover:text-[#E07A5F] transition-colors cursor-pointer"
           >
             View All Tasks <ArrowRight className="w-4 h-4" />
-          </button>
+          </Link>
         </div>
       </Card>
 

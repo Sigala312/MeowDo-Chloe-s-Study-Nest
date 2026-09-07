@@ -1,50 +1,45 @@
-'use client';
-
-import React, { useState } from 'react';
-import { FocusHeader } from '../../components/focus/FocusHeader';
-import { FocusTimerCard } from '../../components/focus/FocusTimerCard';
-import { FocusSessionFlow } from '../../components/focus/FocusSessionFlow';
-import { FocusSessionsList, SessionItem } from '../../components/focus/FocusSessionsList';
-import { FocusStats } from '../../components/focus/FocusStats';
-import { AmbientPlayer } from '../../components/focus/AmbientPlayer';
-
-const INITIAL_SESSIONS: SessionItem[] = [
-  { id: 1, title: 'Focus #1', duration: '25 min', time: '9:00 AM', status: 'completed' },
-  { id: 2, title: 'Focus #2', duration: '25 min', time: '10:00 AM', status: 'completed' },
-  { id: 3, title: 'Focus #3', duration: '25 min', time: 'In progress', status: 'in_progress' },
-  { id: 4, title: 'Focus #4', duration: '25 min', time: '—', status: 'pending' },
-  { id: 5, title: 'Focus #5', duration: '25 min', time: '—', status: 'pending' },
-];
+import React from 'react';
+import { PomodoroTimer } from '../../components/focus/PomodoroTimer';
+import { TodaysFocus } from '../../components/focus/TodaysFocus';
+import { FocusGoal } from '../../components/focus/FocusGoal';
+import { FocusStatistics } from '../../components/focus/FocusStatistics';
+import { MusicPlayer } from '../../components/focus/MusicPlayer';
 
 export default function FocusPage() {
-  const [isRunning, setIsRunning] = useState(false);
-  const [taskTitle, setTaskTitle] = useState('React API 串接');
-
   return (
-    <div className="relative min-h-screen p-6 md:p-8 space-y-6 max-w-[1200px] mx-auto">
-      {/* 1. Header */}
-      <FocusHeader completedSessions={3} totalSessions={5} />
-
-      {/* 2. 計時器核心卡片 */}
-      <FocusTimerCard
-        taskTitle={taskTitle}
-        timeLeft="24:37"
-        isRunning={isRunning}
-        onToggleTimer={() => setIsRunning(!isRunning)}
-        onResetTimer={() => setIsRunning(false)}
-      />
-
-      {/* 3. 番茄流程條 */}
-      <FocusSessionFlow />
-
-      {/* 4. 雙欄：今日紀錄 + 統計 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <FocusSessionsList sessions={INITIAL_SESSIONS} />
-        <FocusStats totalTime="1h 15m" completedSessions={3} xpEarned={150} />
+    <div className="p-8 space-y-6 max-w-[1400px] mx-auto">
+      {/* 頂部標題與副標題 */}
+      <div>
+        <h1 className="text-3xl font-extrabold text-[#4A3E3D] flex items-center gap-2">
+          Focus 🐾
+        </h1>
+        <p className="text-sm text-[#8C7A6B] font-medium mt-1">
+          Stay focused, make progress, and be proud of yourself! ♡
+        </p>
       </div>
 
-      {/* 5. 底部音樂與背景音播放器 */}
-      <AmbientPlayer />
+      {/* 上半部：3 欄排版 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="lg:col-span-4">
+          <PomodoroTimer />
+        </div>
+        <div className="lg:col-span-5">
+          <TodaysFocus />
+        </div>
+        <div className="lg:col-span-3">
+          <FocusGoal />
+        </div>
+      </div>
+
+      {/* 下半部：2 欄排版 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="lg:col-span-7">
+          <FocusStatistics />
+        </div>
+        <div className="lg:col-span-5">
+          <MusicPlayer />
+        </div>
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import authRouter from './modules/auth/auth.router.js';
 import userRouter from './modules/user/user.router.js';
 import categoryRouter from './modules/category/category.router.js';
 import tagRouter from './modules/tag/tag.router.js';
+import wheelRouter from './modules/wheel/wheel.router.js';
 import taskRouter from './modules/task/task.router.js';
 
 
@@ -41,6 +42,8 @@ app.use('/api/category', categoryRouter);
 app.use('/api/tag', tagRouter);
 
 app.use('/api/task', taskRouter);
+
+app.use('/api/wheel', wheelRouter);
 
 // 5. 處理 404 路由
 app.use((req: Request, res: Response) => {

@@ -30,15 +30,21 @@ model User {
   exp    Int @default(0) // 當前經驗值
   tokens Int @default(0) // 升級或完成專注獲得的代幣數
 
+  // 🍅 新增番茄代幣機制
+  tomatoes           Int      @default(0)
+  todayTomatoesCount Int      @default(0)
+  lastTomatoDate     DateTime @default(now())
+
   // 帳號與 Session (NextAuth / Auth.js 標準規格)
   accounts Account[]
   sessions Session[]
 
-  tasks      Task[]
-  pomodoros  PomodoroLog[]
-  drawLogs   WheelDrawLog[]
-  categories Category[]
-  tags       Tag[]
+  tasks        Task[]
+  pomodoros    PomodoroLog[]
+  wheelRewards WheelReward[]
+  drawLogs     WheelDrawLog[]
+  categories   Category[]
+  tags         Tag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -46,13 +52,14 @@ model User {
 
 // 2. 待辦事項模型
 model Task {
-  id            String    @id @default(cuid())
-  title         String // 事項名稱
-  isCompleted   Boolean   @default(false)
-  expReward     Int       @default(20) // 完成該任務可獲得的經驗值 (預設 20 EXP)
-  scheduledTime String? // 顯示時間標籤 (如 "10:00-11:30")
-  dueDate       DateTime?
-  completedAt   DateTime?
+  id              String    @id @default(cuid())
+  title           String // 事項名稱
+  isCompleted     Boolean   @default(false)
+  hasEarnedReward Boolean   @default(false)
+  expReward       Int       @default(20) // 完成該任務可獲得的經驗值 (預設 20 EXP)
+  scheduledTime   String? // 顯示時間標籤 (如 "10:00-11:30")
+  dueDate         DateTime?
+  completedAt     DateTime?
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -118,24 +125,39 @@ model PomodoroLog {
 // 5. 🎡 輪盤獎品項目
 model WheelReward {
   id          String  @id @default(cuid())
-  title       String // 獎品名稱 (如 "☕ Max 請喝咖啡", "🐾 貓咪讚賞卡", "🎮 自由打電玩 1 小時")
-  icon        String? // 獎品圖示
+  title       String // 獎品名稱 (如 "☕ 熱可可兌換券", "🐾 貓咪讚賞勳章")
+  icon        String? // 獎品圖示或類別
+  categoryTag String? // 獎品標籤 (如 "Relax", "Food", "Entertainment", "Personal")
   probability Float // 中獎機率 (0.0 ~ 1.0)
-  isRare      Boolean @default(false) // 是否為稀有大獎
+  isRare      Boolean @default(false)
+
+  // 綁定使用者（若希望系統預設獎品全站通用，也可設為 Optional `userId String?`）
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   drawLogs WheelDrawLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 // 6. 🎟️ 抽獎歷史紀錄
 model WheelDrawLog {
-  id      String   @id @default(cuid())
-  drawnAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  drawnAt    DateTime  @default(now())
+  isRedeemed Boolean   @default(false) // 新增：兌換券是否已使用/兌換
+  redeemedAt DateTime? // 新增：兌換時間
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   rewardId String
-  reward   WheelReward @relation(fields: [rewardId], references: [id])
+  reward   WheelReward @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([rewardId])
 }
 
 // --- NextAuth.js 標準第三方登入模型 (Google / GitHub) ---

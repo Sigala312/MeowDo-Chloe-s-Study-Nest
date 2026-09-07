@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Bell } from 'lucide-react';
 import { usePageHeader } from '../context/PageHeaderContext';
 import { DropdownMenu, UserProfile } from '../ui/DropdownMenu';
+import { TomatoBadge } from '../ui/TomatoBadge'; // 1. 匯入 TomatoBadge
 
 export default function Header() {
   const router = useRouter();
@@ -49,9 +50,7 @@ export default function Header() {
   };
 
   return (
-    // 使用 absolute 讓 Header 浮在頁面上方，zIndex 設高，不佔用垂直空間
     <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 md:px-8 pt-6 pb-2 pointer-events-none">
-      {/* 只有當 title 有值且不為空字串時才渲染左側標題 */}
       <div className="pointer-events-auto">
         {title && (
           <h1 className="text-2xl md:text-3xl font-black text-[#3D2C2E] flex items-center gap-2">
@@ -65,8 +64,11 @@ export default function Header() {
         )}
       </div>
 
-      {/* 右上角按鈕組（恢復點擊事件） */}
+      {/* 右上角按鈕組 */}
       <div className="flex items-center gap-3 pointer-events-auto ml-auto">
+        {/* 2. 加入番茄數量顯示組件 */}
+        <TomatoBadge apiUrl={API_URL} />
+
         <button
           type="button"
           className="p-2.5 rounded-2xl bg-[#FFFDF9]/80 backdrop-blur-md border border-[#EADBC8] text-[#6C5B52] hover:bg-white transition-all relative shadow-xs cursor-pointer"

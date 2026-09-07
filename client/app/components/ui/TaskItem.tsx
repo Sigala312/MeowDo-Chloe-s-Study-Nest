@@ -7,7 +7,7 @@ export interface TaskItemProps {
   id: string;
   title: string;
   category: string;
-  pomodoros: number;
+  tags?: string[];
   completed: boolean;
   icon?: React.ReactNode;
   iconBg?: string;
@@ -19,7 +19,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   id,
   title,
   category,
-  pomodoros,
+  tags = [],
   completed,
   icon = '📝',
   iconBg = 'bg-[#F9F0E6]',
@@ -36,7 +36,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
       }`}
     >
       <div className="flex items-center gap-3.5">
-        {/* 自訂手繪風 Checkbox */}
+        {/* 自訂 Checkbox */}
         <button
           type="button"
           className={`w-6 h-6 rounded-xl border-2 flex items-center justify-center transition-colors ${
@@ -62,9 +62,24 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           >
             {title}
           </h4>
-          <p className="text-xs text-[#8C7A6B] mt-0.5">
-            {category} <span className="mx-1">•</span> {pomodoros} Pomodoro{pomodoros > 1 ? 's' : ''}
-          </p>
+          <div className="flex items-center gap-1.5 flex-wrap text-xs text-[#8C7A6B] mt-0.5">
+            <span>{category}</span>
+            {tags.length > 0 && (
+              <>
+                <span>•</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {tags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 rounded-md bg-[#FAF6F0] border border-[#EADBC8] text-[10px] font-bold text-[#6C5B52]"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -76,7 +91,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           </span>
         ) : isToday ? (
           <span className="flex items-center gap-1 text-xs font-bold text-[#E07A5F] bg-[#FDEFEA] px-2.5 py-1 rounded-full">
-            🍅 Today
+            🍅 In Progress
           </span>
         ) : null}
       </div>

@@ -3,10 +3,10 @@ import { TaskService } from './task.service.js';
 import { createTaskSchema, updateTaskSchema } from './task.schema.js';
 
 export class TaskController {
-  // GET /api/tasks
+  // GET /api/task or /api/tasks
   static async getTasks(req: Request, res: Response) {
     try {
-      const userId = (req.user as { id: string }).id; // 從 Auth Middleware 取得
+      const userId = (req.user as { id: string }).id;
       const tasks = await TaskService.getTasksByUserId(userId);
 
       return res.status(200).json({
@@ -18,11 +18,11 @@ export class TaskController {
     }
   }
 
-  // POST /api/tasks
+  // POST /api/task or /api/tasks
   static async createTask(req: Request, res: Response) {
     try {
       const userId = (req.user as { id: string }).id;
-      
+
       // Zod 驗證 Request Body
       const parseResult = createTaskSchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -44,7 +44,7 @@ export class TaskController {
     }
   }
 
-  // PUT /api/tasks/:id
+  // PATCH /api/task/:id
   static async updateTask(req: Request, res: Response) {
     try {
       const userId = (req.user as { id: string }).id;
@@ -57,7 +57,7 @@ export class TaskController {
         });
       }
 
-      // Zod 驗證 (確保 updateTaskSchema 支援 partial 更新)
+      // Zod 部分更新驗證
       const parseResult = updateTaskSchema.safeParse(req.body);
       if (!parseResult.success) {
         return res.status(400).json({
@@ -66,26 +66,28 @@ export class TaskController {
         });
       }
 
-      const updatedTask = await TaskService.updateTask(taskId, userId, parseResult.data);
+      // TaskService.updateTask 建議回傳包含 { task, reward } 或直接回傳 result 物件
+      const result = await TaskService.updateTask(taskId, userId, parseResult.data);
 
-      if (!updatedTask) {
+      if (!result) {
         return res.status(404).json({
           success: false,
           message: 'Task not found or unauthorized',
         });
       }
 
+      // 透傳包含 task 與 reward (若有) 的完整物件給前端
       return res.status(200).json({
         success: true,
         message: 'Task updated successfully',
-        data: updatedTask,
+        data: result,
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
     }
   }
 
-  // DELETE /api/tasks/:id
+  // DELETE /api/task/:id
   static async deleteTask(req: Request, res: Response) {
     try {
       const userId = (req.user as { id: string }).id;
