@@ -27,7 +27,6 @@ export class WheelService {
     });
 
     const rewards = await prisma.wheelReward.findMany({
-      where: { userId },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -118,7 +117,7 @@ export class WheelService {
       throw new Error(`Not enough cat foods ! Spinning requires ${COST} cat foods 🥫.`);
     }
 
-    const rewards = await prisma.wheelReward.findMany({ where: { userId } });
+    const rewards = await prisma.wheelReward.findMany();
     if (rewards.length === 0) {
       throw new Error('No rewards available. Please add rewards first.');
     }

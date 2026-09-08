@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Gift, Coffee, Gamepad2, Film, Cake, BookOpen } from 'lucide-react';
+import { Gift, Coffee, Gamepad2, Film, Cake, BookOpen, Sparkles } from 'lucide-react';
 
 interface RewardItem {
   id: string;
@@ -19,6 +19,7 @@ const INITIAL_REWARDS: RewardItem[] = [
   { id: '3', title: 'Watch a movie', category: 'Entertainment', icon: Film, bgColor: 'bg-[#FDEBF1]', tagBg: 'bg-[#FCE4EC]', tagColor: 'text-[#D81B60]' },
   { id: '4', title: 'Eat dessert', category: 'Food', icon: Cake, bgColor: 'bg-[#FFF8E7]', tagBg: 'bg-[#FFF3E0]', tagColor: 'text-[#E65100]' },
   { id: '5', title: 'Free time', category: 'Personal', icon: BookOpen, bgColor: 'bg-[#F0F7F1]', tagBg: 'bg-[#E8F5E9]', tagColor: 'text-[#2E7D32]' },
+  { id: '6', title: 'Mystery Gift', category: 'Surprise', icon: Sparkles, bgColor: 'bg-[#FFF4E5]', tagBg: 'bg-[#FFE8CC]', tagColor: 'text-[#D97706]' },
 ];
 
 export const RewardListCard: React.FC = () => {
@@ -30,9 +31,6 @@ export const RewardListCard: React.FC = () => {
           <Gift className="w-5 h-5 text-[#E07A5F]" />
           <h2 className="text-lg font-black text-[#3D2C2E]">Your Reward List</h2>
         </div>
-        {/* <button className="flex items-center gap-1 bg-[#FCE3D7] hover:bg-[#F8D2C0] text-[#E07A5F] px-3 py-1.5 rounded-2xl text-xs font-black transition-all cursor-pointer">
-          <Plus className="w-4 h-4" /> Add Reward
-        </button> */}
       </div>
 
       {/* Rewards List */}
@@ -55,20 +53,10 @@ export const RewardListCard: React.FC = () => {
                 <span className={`text-[10px] font-black px-2.5 py-1 rounded-xl ${item.tagBg} ${item.tagColor}`}>
                   {item.category}
                 </span>
-                {/* <button className="text-[#8C7A6B] hover:text-[#3D2C2E] p-1 cursor-pointer">
-                  <MoreHorizontal className="w-4 h-4" />
-                </button> */}
               </div>
             </div>
           );
         })}
-      </div>
-
-      {/* Footer Banner */}
-      <div className="bg-[#FAF6F0]/80 border border-dashed border-[#EADBC8] rounded-2xl p-3 flex items-center justify-center gap-2 text-xs font-bold text-[#8C7A6B]">
-        <span>🐾</span>
-        <span>Add more rewards to make your wheel even more fun!</span>
-        <span>✨</span>
       </div>
     </div>
   );

@@ -39,12 +39,11 @@ model User {
   accounts Account[]
   sessions Session[]
 
-  tasks        Task[]
-  pomodoros    PomodoroLog[]
-  wheelRewards WheelReward[]
-  drawLogs     WheelDrawLog[]
-  categories   Category[]
-  tags         Tag[]
+  tasks      Task[]
+  pomodoros  PomodoroLog[]
+  drawLogs   WheelDrawLog[]
+  categories Category[]
+  tags       Tag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -130,17 +129,13 @@ model WheelReward {
   categoryTag String? // 獎品標籤 (如 "Relax", "Food", "Entertainment", "Personal")
   probability Float // 中獎機率 (0.0 ~ 1.0)
   isRare      Boolean @default(false)
-
-  // 綁定使用者（若希望系統預設獎品全站通用，也可設為 Optional `userId String?`）
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageKey    String?
+  rarity      String
 
   drawLogs WheelDrawLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([userId])
 }
 
 // 6. 🎟️ 抽獎歷史紀錄

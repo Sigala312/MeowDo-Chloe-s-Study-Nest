@@ -3,31 +3,94 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { Sparkles, Coffee, Gift, Gamepad2, Film, Cake, BookOpen, PawPrint } from 'lucide-react';
+import { RewardWinModal } from './RewardWinModal';
 
+// 預設 6 個區塊對應的 imageKey 與樣式設定
 const REWARDS = [
-  { id: '1', name: 'Coffee', icon: Coffee, color: '#FFF8F0', iconColor: '#5C3D2E' },
-  { id: '2', name: 'Play games', icon: Gamepad2, color: '#E8E5F7', iconColor: '#6B5BB9' },
-  { id: '3', name: 'Watch a movie', icon: Film, color: '#FCE4EC', iconColor: '#D81B60' },
-  { id: '4', name: 'Eat dessert', icon: Cake, color: '#FFF3E0', iconColor: '#E65100' },
-  { id: '5', name: 'Free time', icon: BookOpen, color: '#E8F5E9', iconColor: '#2E7D32' },
-  { id: '6', name: 'Gift Box', icon: Gift, color: '#E1F5FE', iconColor: '#0277BD' },
+  { id: '1', key: 'pass_coffee_ticket', name: 'Gift Box', icon: Gift, color: '#E1F5FE', iconColor: '#0277BD' },
+  { id: '2', key: 'coffee', name: 'Coffee', icon: Coffee, color: '#FFF8F0', iconColor: '#5C3D2E' },
+  { id: '3', key: 'play_games', name: 'Play games', icon: Gamepad2, color: '#E8E5F7', iconColor: '#6B5BB9' },
+  { id: '4', key: 'watch_movie', name: 'Watch a movie', icon: Film, color: '#FCE4EC', iconColor: '#D81B60' },
+  { id: '5', key: 'eat_dessert', name: 'Eat dessert', icon: Cake, color: '#FFF3E0', iconColor: '#E65100' },
+  { id: '6', key: 'free_time', name: 'Free time', icon: BookOpen, color: '#E8F5E9', iconColor: '#2E7D32' },
 ];
 
 export const WheelSectionCard: React.FC = () => {
   const [rotation, setRotation] = useState<number>(0);
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
+  
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [wonData, setWonData] = useState<any>(null);
 
-  const handleSpin = () => {
+  const handleSpin = async () => {
     if (isSpinning) return;
     setIsSpinning(true);
 
-    const extraDegrees = Math.floor(Math.random() * 360);
-    const newRotation = rotation + 1800 + extraDegrees;
-    setRotation(newRotation);
+    try {
+      // 1. 從前端儲存空間取得 Token
+      const token = localStorage.getItem('token');
 
-    setTimeout(() => {
+      const res = await fetch('http://localhost:8080/api/wheel/spin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (res.status === 401) {
+        alert('Login session expired. Please log in again.');
+        setIsSpinning(false);
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        alert(data.message || 'Spin failed. Please check your tokens and try again!');
+        setIsSpinning(false);
+        return;
+      }
+
+      const drawnReward = data.drawnReward || data.reward || data.data?.drawnReward;
+const drawLogId = data.drawLogId || data.data?.drawLogId;
+
+if (!drawnReward || !drawnReward.imageKey) {
+  console.error('API response structure invalid:', data);
+  alert('Reward data missing in API response. Please check server payload.');
+  setIsSpinning(false);
+  return;
+}
+
+      // 2. 計算旋轉角度
+      const targetIndex = REWARDS.findIndex((item) => item.key === drawnReward.imageKey);
+      const safeIndex = targetIndex === -1 ? 0 : targetIndex;
+
+      const totalSections = REWARDS.length;
+      const degreesPerSection = 360 / totalSections; // 60 度/扇區
+
+      const targetDegree = 360 - safeIndex * degreesPerSection;
+      
+      const currentRotationBase = Math.ceil(rotation / 360) * 360;
+      const newRotation = currentRotationBase + 1800 + targetDegree;
+
+      setRotation(newRotation);
+
+      // 3. 動畫 4 秒後開啟中獎視窗
+      setTimeout(() => {
+        setIsSpinning(false);
+        setWonData({
+          drawLogId,
+          reward: drawnReward,
+        });
+        setShowModal(true);
+      }, 4000);
+
+    } catch (error) {
+      console.error('Spin API error:', error);
+      alert('Network error. Failed to connect to server.');
       setIsSpinning(false);
-    }, 4000);
+    }
   };
 
   return (
@@ -42,7 +105,7 @@ export const WheelSectionCard: React.FC = () => {
       {/* 左下角貓咪插圖 */}
       <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-4 w-20 h-20 sm:w-24 sm:h-24 pointer-events-none z-20">
         <Image
-          src="/ChatGPT_Image_2026年9月6日_下午06_11_38-removebg-preview.png" // 請確保將圖片放置於 public 目錄中，或改為你的圖片路徑
+          src="/ChatGPT_Image_2026年9月6日_下午06_11_38-removebg-preview.png"
           alt="Smart Cat"
           width={200}
           height={200}
@@ -69,35 +132,36 @@ export const WheelSectionCard: React.FC = () => {
         {/* 2. 外圍木質圓框與轉盤 */}
         <div className="relative w-[300px] h-[300px] rounded-full border-[12px] border-[#F4E8DC] shadow-[0_0_0_4px_#DFA382] flex items-center justify-center overflow-hidden z-20">
           
-          {/* 轉盤本體 (包含 6 個 SVG 扇形區塊) */}
+          {/* 轉盤本體 */}
           <div
             className="w-full h-full relative transition-transform duration-[4000ms] cubic-bezier(0.15, 0.9, 0.2, 1)"
             style={{ transform: `rotate(${rotation}deg)` }}
           >
             <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
-              {REWARDS.map((item, index) => {
-                const angle = 360 / REWARDS.length;
-                const startAngle = index * angle;
-                const endAngle = startAngle + angle;
+  {REWARDS.map((item, index) => {
+    const angle = 360 / REWARDS.length;
+    const startAngle = index * angle;
+    const endAngle = startAngle + angle;
 
-                const x1 = 50 + 50 * Math.cos((Math.PI * startAngle) / 180);
-                const y1 = 50 + 50 * Math.sin((Math.PI * startAngle) / 180);
-                const x2 = 50 + 50 * Math.cos((Math.PI * endAngle) / 180);
-                const y2 = 50 + 50 * Math.sin((Math.PI * endAngle) / 180);
+    // 將浮點數四捨五入至小數點後 6 位，避免 SSR 與 Client 端精度偏差
+    const x1 = (50 + 50 * Math.cos((Math.PI * startAngle) / 180)).toFixed(6);
+    const y1 = (50 + 50 * Math.sin((Math.PI * startAngle) / 180)).toFixed(6);
+    const x2 = (50 + 50 * Math.cos((Math.PI * endAngle) / 180)).toFixed(6);
+    const y2 = (50 + 50 * Math.sin((Math.PI * endAngle) / 180)).toFixed(6);
 
-                const pathData = `M 50 50 L ${x1} ${y1} A 50 50 0 0 1 ${x2} ${y2} Z`;
+    const pathData = `M 50 50 L ${x1} ${y1} A 50 50 0 0 1 ${x2} ${y2} Z`;
 
-                return (
-                  <path
-                    key={item.id}
-                    d={pathData}
-                    fill={item.color}
-                    stroke="#FFFDF9"
-                    strokeWidth="1.5"
-                  />
-                );
-              })}
-            </svg>
+    return (
+      <path
+        key={item.id}
+        d={pathData}
+        fill={item.color}
+        stroke="#FFFDF9"
+        strokeWidth="1.5"
+      />
+    );
+  })}
+</svg>
 
             {/* 扇形內的 Icon */}
             <div className="absolute inset-0 pointer-events-none">
@@ -133,6 +197,13 @@ export const WheelSectionCard: React.FC = () => {
         <Sparkles className="w-5 h-5" />
         {isSpinning ? 'SPINNING...' : 'SPIN'}
       </button>
+
+      {/* 5. 掛載中獎 Modal */}
+      <RewardWinModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        drawData={wonData}
+      />
     </div>
   );
 };
