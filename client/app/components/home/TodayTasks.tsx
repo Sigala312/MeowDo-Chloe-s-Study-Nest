@@ -43,7 +43,6 @@ export const TodayTasks: React.FC = () => {
       const token = localStorage.getItem('token');
       const todayISO = new Date().toISOString().split('T')[0];
 
-      // 帶上 date 參數，讓後端只抓取當日任務
       const res = await fetch(`${API_URL}/api/task?date=${todayISO}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -53,7 +52,6 @@ export const TodayTasks: React.FC = () => {
       const result = await res.json();
 
       if (res.ok && result.success) {
-        // 過濾僅保留 dueDate 為今天的 Task（若後端未支援 query parameter，前端做二次過濾）
         const todayTasksList = result.data.filter((task: any) =>
           task.dueDate ? isSameDay(task.dueDate) : true
         );
@@ -114,6 +112,9 @@ export const TodayTasks: React.FC = () => {
       const result = await res.json();
 
       if (res.ok && result.success) {
+        // 🌟 關鍵發送：通知跨元件（包含 UpcomingTasks）同步更新
+        window.dispatchEvent(new Event('task-updated'));
+
         if (nextCompletedState) {
           window.dispatchEvent(new Event('cat-food-updated'));
           window.dispatchEvent(new Event('tomatoes-updated'));
@@ -135,6 +136,12 @@ export const TodayTasks: React.FC = () => {
         )
       );
     }
+  };
+
+  // 新增 Task 後的 Callback：既抓 Today，也發廣播給 Upcoming
+  const handleTaskAdded = () => {
+    fetchTodayTasks();
+    window.dispatchEvent(new Event('task-created'));
   };
 
   // 3. 計算完成任務數量與罐頭總數
@@ -245,7 +252,7 @@ export const TodayTasks: React.FC = () => {
       <AddTaskModal
         isOpen={isAddTaskOpen}
         onClose={() => setIsAddTaskOpen(false)}
-        onTaskAdded={fetchTodayTasks}
+        onTaskAdded={handleTaskAdded}
       />
 
       <CreateCategoryModal

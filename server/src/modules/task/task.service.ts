@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma.js'; // 統一使用專案內的單例 PrismaClient
 import { CreateTaskInput, UpdateTaskInput } from './task.schema.js';
 import { WheelService } from '../wheel/wheel.service.js';
+import { NotificationService } from '../Notification/notification.service.js';
 
 export class TaskService {
   // 取得使用者的所有 Tasks (包含關聯的 Category 與 Tags)
@@ -26,56 +27,67 @@ export class TaskService {
   }
 
   // 建立 Task
-  // 建立 Task
-static async createTask(userId: string, input: CreateTaskInput) {
-  const { title, categoryId, tags = [], dueDate, description } = input;
+  static async createTask(userId: string, input: CreateTaskInput) {
+    const { title, categoryId, tags = [], dueDate, description } = input;
 
-  // 1. 取得使用者現有的 Tags
-  const existingTags = await prisma.tag.findMany({
-    where: {
-      userId,
-      name: { in: tags },
-    },
-  });
-
-  const existingTagNames = existingTags.map((t) => t.name);
-  const newTagNames = tags.filter((t) => !existingTagNames.includes(t));
-
-  // 2. 先建立不存在的 Tags
-  if (newTagNames.length > 0) {
-    await prisma.tag.createMany({
-      data: newTagNames.map((name) => ({ name, userId })),
-      skipDuplicates: true,
-    });
-  }
-
-  // 3. 重新查詢所有需要的 Tag 物件以取得完整的 IDs
-  const allTargetTags = await prisma.tag.findMany({
-    where: {
-      userId,
-      name: { in: tags },
-    },
-    select: { id: true },
-  });
-
-  // 4. 透過 ID 進行 connect 關聯建立
-  return await prisma.task.create({
-    data: {
-      title,
-      userId,
-      categoryId,
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      description,
-      tags: {
-        connect: allTargetTags.map((tag) => ({ id: tag.id })),
+    // 1. 取得使用者現有的 Tags
+    const existingTags = await prisma.tag.findMany({
+      where: {
+        userId,
+        name: { in: tags },
       },
-    },
-    include: {
-      category: true,
-      tags: true,
-    },
-  });
-}
+    });
+
+    const existingTagNames = existingTags.map((t) => t.name);
+    const newTagNames = tags.filter((t) => !existingTagNames.includes(t));
+
+    // 2. 先建立不存在的 Tags
+    if (newTagNames.length > 0) {
+      await prisma.tag.createMany({
+        data: newTagNames.map((name) => ({ name, userId })),
+        skipDuplicates: true,
+      });
+    }
+
+    // 3. 重新查詢所有需要的 Tag 物件以取得完整的 IDs
+    const allTargetTags = await prisma.tag.findMany({
+      where: {
+        userId,
+        name: { in: tags },
+      },
+      select: { id: true },
+    });
+
+    // 4. 透過 ID 進行 connect 關聯建立
+    const newTask = await prisma.task.create({
+      data: {
+        title,
+        userId,
+        categoryId,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+        description,
+        tags: {
+          connect: allTargetTags.map((tag) => ({ id: tag.id })),
+        },
+      },
+      include: {
+        category: true,
+        tags: true,
+      },
+    });
+
+    // 👈 5. 建立任務成功後，如果有設定到期日，觸發待辦事項提醒通知
+    if (newTask.dueDate) {
+      try {
+        const formattedDate = new Date(newTask.dueDate).toLocaleDateString();
+        await NotificationService.notifyTaskReminder(userId, newTask.title, formattedDate);
+      } catch (error) {
+        console.error('Failed to send task reminder notification:', error);
+      }
+    }
+
+    return newTask;
+  }
 
  
     // 執行更新任務

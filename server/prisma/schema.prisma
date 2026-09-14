@@ -39,11 +39,12 @@ model User {
   accounts Account[]
   sessions Session[]
 
-  tasks      Task[]
-  pomodoros  PomodoroLog[]
-  drawLogs   WheelDrawLog[]
-  categories Category[]
-  tags       Tag[]
+  tasks         Task[]
+  pomodoros     PomodoroLog[]
+  drawLogs      WheelDrawLog[]
+  notifications Notification[]
+  categories    Category[]
+  tags          Tag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -153,6 +154,34 @@ model WheelDrawLog {
 
   @@index([userId])
   @@index([rewardId])
+}
+
+// 8. 🔔 系統通知模型
+model Notification {
+  id      String           @id @default(cuid())
+  type    NotificationType @default(SYSTEM) // 通知類型
+  title   String // 通知標題 (如 "🎉 升級通知！")
+  content String           @db.Text // 通知內容 (如 "恭喜您升到 Level 5，獲得 10 個代幣！")
+  isRead  Boolean          @default(false) // 是否已讀
+  linkUrl String? // 點擊通知跳轉的頁面 (如 "/tasks", "/wheel")
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isRead]) // 加速查詢未讀通知數量
+}
+
+// 🔔 通知類型 Enum
+enum NotificationType {
+  SYSTEM // 系統公告 / 一般通知
+  TASK // 待辦事項提醒 (如到期、完成)
+  POMODORO // 番茄鐘獎勵 / 提醒
+  GAMIFY // 遊戲化升級 / 獲得經驗 / 獲得罐頭代幣
+  REWARD // 轉盤抽獎結果 / 兌換通知
 }
 
 // --- NextAuth.js 標準第三方登入模型 (Google / GitHub) ---

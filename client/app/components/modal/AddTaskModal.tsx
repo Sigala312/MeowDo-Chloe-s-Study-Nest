@@ -1,10 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Plus, Loader2 } from 'lucide-react';
+import { 
+  X, 
+  Calendar, 
+  Clock, 
+  Plus, 
+  Loader2, 
+  FileText, 
+  Folder, 
+  Tag as TagIcon, 
+  ChevronDown,
+  PawPrint
+} from 'lucide-react';
 import { CreateCategoryModal } from './CreateCategoryModal';
 import { AddTagModal } from './AddTagModal';
-import { Button } from '../ui/Button';
 
 export interface Category {
   id: string;
@@ -24,6 +34,15 @@ interface AddTaskModalProps {
   onTaskAdded?: () => void;
 }
 
+// 標籤彩色盤
+const TAG_COLORS = [
+  { bg: 'bg-[#FDE8E3]', text: 'text-[#C86D51]', border: 'border-[#F8D2C9]' }, // 暖粉
+  { bg: 'bg-[#E3EFFD]', text: 'text-[#4A7BB0]', border: 'border-[#CDE0F9]' }, // 淡藍
+  { bg: 'bg-[#F1E8FA]', text: 'text-[#8A63B4]', border: 'border-[#E2D2F3]' }, // 柔紫
+  { bg: 'bg-[#EAF3E4]', text: 'text-[#5E8C48]', border: 'border-[#D4E6CA]' }, // 草綠
+  { bg: 'bg-[#FAF3DC]', text: 'text-[#A08332]', border: 'border-[#F2E5B9]' }, // 淺黃
+];
+
 export const AddTaskModal: React.FC<AddTaskModalProps> = ({
   isOpen,
   onClose,
@@ -31,30 +50,25 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 }) => {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-  // 取得今天的預設 YYYY-MM-DD
   const getTodayDateString = () => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   };
 
-  // 表單 State
   const [taskName, setTaskName] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedTagNames, setSelectedTagNames] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState(getTodayDateString());
   const [dueTime, setDueTime] = useState('10:00');
 
-  // API 資料 State
   const [categories, setCategories] = useState<Category[]>([]);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 控制子彈窗開關
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
 
-  // 重置表單
   const resetForm = () => {
     setTaskName('');
     setSelectedTagNames([]);
@@ -67,7 +81,6 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     }
   };
 
-  // 1. 開啟 Modal 時，向後端撈取 Categories 與 Tags 列表
   useEffect(() => {
     if (!isOpen) return;
 
@@ -77,7 +90,6 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
 
-        // 平行向 API 發送 GET 請求
         const [catRes, tagRes] = await Promise.all([
           fetch(`${API_URL}/api/category`, { headers }),
           fetch(`${API_URL}/api/tag`, { headers }),
@@ -86,16 +98,14 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
         const catResult = await catRes.json();
         const tagResult = await tagRes.json();
 
-        // 設定 Categories
         if (catRes.ok && catResult.success) {
-          const catList: Category[] = catResult.data;
+          const catList: Category[] = catResult.data || [];
           setCategories(catList);
           if (catList.length > 0 && !selectedCategoryId) {
             setSelectedCategoryId(catList[0].id);
           }
         }
 
-        // 設定 Tags
         if (tagRes.ok && tagResult.success) {
           setAvailableTags(tagResult.data || []);
         }
@@ -111,13 +121,11 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
   if (!isOpen) return null;
 
-  // 2. Category 建立後的回呼
   const handleCategoryCreated = (newCat: Category) => {
     setCategories((prev) => [...prev, newCat]);
     setSelectedCategoryId(newCat.id);
   };
 
-  // 3. Tag 建立後的回呼
   const handleTagCreated = (newTag: Tag) => {
     setAvailableTags((prev) => [...prev, newTag]);
     if (!selectedTagNames.includes(newTag.name)) {
@@ -125,14 +133,12 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     }
   };
 
-  // 標籤切換/移除選擇
   const handleToggleTag = (tagName: string) => {
     setSelectedTagNames((prev) =>
       prev.includes(tagName) ? prev.filter((t) => t !== tagName) : [...prev, tagName]
     );
   };
 
-  // 4. 提交 Task
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskName.trim()) {
@@ -143,9 +149,8 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      const combinedDateTime = dueTime 
-        ? new Date(`${dueDate}T${dueTime}`).toISOString()
-        : new Date(dueDate).toISOString();
+      const timePart = dueTime || '23:59';
+      const combinedDateTime = new Date(`${dueDate}T${timePart}`).toISOString();
 
       const payload = {
         title: taskName.trim(),
@@ -170,15 +175,23 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
         throw new Error(result.message || 'Failed to add task.');
       }
 
+      // 🌟 關鍵修正：發送全域事件廣播給 UpcomingTasks 重新拉取資料
+      window.dispatchEvent(new Event('task-created'));
+      window.dispatchEvent(new Event('task-updated'));
+
       resetForm();
       onClose();
 
       if (onTaskAdded) {
         onTaskAdded();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating task:', err);
-      alert(err.message || 'An error occurred while creating the task.');
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : 'An error occurred while creating the task.';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -186,199 +199,241 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-xs p-4">
-        <div className="w-full max-w-md bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-2xl relative animate-in fade-in zoom-in-95">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-black text-[#3D2C2E]">Add New Task</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="p-1 h-auto w-auto rounded-full text-[#8C7A6B] hover:bg-[#FAF6F0]"
-            >
-              <X className="w-5 h-5" />
-            </Button>
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/25 backdrop-blur-xs p-4 font-sans selection:bg-[#F2A68D]/30">
+        {/* 視窗最大寬度調小至 420px，內邊距調為 p-5 sm:p-6 */}
+        <div className="w-full max-w-[390px] bg-[#FFFBF5] border-4 border-[#F2EAE1] rounded-[32px] p-5 sm:p-6 shadow-2xl relative animate-in fade-in zoom-in-95">
+          
+          {/* 貓咪插圖：位置移至 right-16 (更靠左)，大小調整為 w-20 h-20 */}
+          <div className="absolute -top-10 right-16 w-20 h-20 pointer-events-none select-none z-10">
+            <img
+              src="/螢幕擷取畫面_2026-09-10_024116-removebg-preview.png"
+              alt="Cat Illustration Header"
+              className="w-full h-full object-contain drop-shadow-md"
+            />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Task Name */}
+          {/* Header */}
+          <div className="flex items-start justify-between mb-3 relative z-0">
             <div>
-              <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
-                Task Name
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="e.g. Read 20 pages of a book"
-                  value={taskName}
-                  onChange={(e) => setTaskName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none focus:border-[#E07A5F]"
-                />
-                <span className="absolute right-3 top-2.5 text-base pointer-events-none">🐱</span>
+              <div className="flex items-center gap-1.5">
+                <PawPrint className="w-4 h-4 text-[#4A3228] fill-[#4A3228]" />
+                <h2 className="text-xl font-bold text-[#4A3228] tracking-wide">
+                  Add New Task
+                </h2>
               </div>
+              <p className="text-[11px] font-semibold text-[#A08C82] mt-0.5 ml-5">
+                Small steps make big changes! <span className="text-[#E57373]">♡</span>
+              </p>
             </div>
+            
+            <button
+              onClick={onClose}
+              className="p-1 rounded-full text-[#9C887B] hover:bg-[#F2EAE1] transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5 stroke-[2.5]" />
+            </button>
+          </div>
 
-            {/* Category */}
-            <div>
-              <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
-                Category
-              </label>
-              <div className="flex flex-wrap gap-2 items-center">
-                {isLoadingData ? (
-                  <div className="flex items-center gap-2 text-xs text-[#8C7A6B] py-1">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#E89874]" /> Loading...
-                  </div>
-                ) : (
-                  categories.map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setSelectedCategoryId(cat.id)}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl border text-xs font-extrabold transition-all cursor-pointer ${
-                        selectedCategoryId === cat.id
-                          ? 'bg-[#FDF3E7] border-[#E89874] text-[#3D2C2E] shadow-xs'
-                          : 'bg-[#FAF6F0] border-[#EADBC8] text-[#6C5B52] hover:bg-[#F4E2D8]'
-                      }`}
-                    >
-                      <span>{cat.icon || '📁'}</span>
-                      <span>{cat.name}</span>
-                    </button>
-                  ))
-                )}
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsCategoryModalOpen(true)}
-                  leftIcon={<Plus className="w-3.5 h-3.5" />}
-                  className="border-dashed border-[#D0BBA2] bg-white text-[#8C7A6B] hover:bg-[#FAF6F0] hover:border-[#D0BBA2] text-xs py-2 px-3 font-extrabold"
-                >
-                  Add Category
-                </Button>
-              </div>
-            </div>
-
-            {/* Tags */}
-            <div>
-              <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">Tags</label>
-              <div className="flex flex-wrap gap-2 items-center">
-                {isLoadingData ? (
-                  <div className="flex items-center gap-2 text-xs text-[#8C7A6B] py-1">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#E89874]" /> Loading...
-                  </div>
-                ) : (
-                  availableTags.map((tag) => {
-                    const isSelected = selectedTagNames.includes(tag.name);
-                    return (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => handleToggleTag(tag.name)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-extrabold transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#FDF3E7] border-[#E89874] text-[#3D2C2E] shadow-xs'
-                            : 'bg-[#FAF6F0] border-[#EADBC8] text-[#6C5B52] hover:bg-[#F4E2D8]'
-                        }`}
-                      >
-                        <span>#{tag.name}</span>
-                        {isSelected && <X className="w-3 h-3 text-[#E89874]" />}
-                      </button>
-                    );
-                  })
-                )}
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsTagModalOpen(true)}
-                  leftIcon={<Plus className="w-3.5 h-3.5" />}
-                  className="border-dashed border-[#D0BBA2] bg-white text-[#8C7A6B] hover:bg-[#FAF6F0] hover:border-[#D0BBA2] text-xs py-1.5 px-3 font-extrabold"
-                >
-                  Add Tag
-                </Button>
-              </div>
-            </div>
-
-            {/* Date & Time */}
-            <div className="grid grid-cols-2 gap-3">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="bg-[#FAF4ED] border border-[#EFE5D8] rounded-[24px] p-3.5 sm:p-4 space-y-3">
+              
+              {/* Task Name */}
               <div>
-                <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
-                  Due Date
+                <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#5C4639] mb-1.5">
+                  <FileText className="w-3.5 h-3.5 text-[#8C7A6B]" />
+                  Task Name
                 </label>
                 <div className="relative flex items-center">
-                  <Calendar className="w-4 h-4 text-[#8C7A6B] absolute left-3 z-10 pointer-events-none" />
                   <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    onClick={(e) => e.currentTarget.showPicker?.()}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none cursor-pointer focus:border-[#E07A5F]"
+                    type="text"
+                    placeholder="e.g. Read 20 pages of a book"
+                    value={taskName}
+                    onChange={(e) => setTaskName(e.target.value)}
+                    className="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-[#FFFBF5] border-2 border-[#EAE0D3] text-xs font-semibold text-[#4A3228] placeholder-[#B8A89D] outline-none focus:border-[#E89874] transition-all"
+                  />
+                  <img
+                    src="/螢幕擷取畫面_2026-09-10_024104-removebg-preview.png"
+                    alt="Cat Icon"
+                    className="absolute right-2.5 w-4 h-4 object-contain pointer-events-none"
                   />
                 </div>
               </div>
 
+              {/* Category */}
               <div>
-                <label className="block text-xs font-extrabold text-[#3D2C2E] mb-1.5">
-                  Time (Optional)
+                <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#5C4639] mb-1.5">
+                  <Folder className="w-3.5 h-3.5 text-[#8C7A6B]" />
+                  Category
                 </label>
-                <div className="relative flex items-center">
-                  <Clock className="w-4 h-4 text-[#8C7A6B] absolute left-3 z-10 pointer-events-none" />
-                  <input
-                    type="time"
-                    value={dueTime}
-                    onChange={(e) => setDueTime(e.target.value)}
-                    onClick={(e) => e.currentTarget.showPicker?.()}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8] text-xs font-bold text-[#3D2C2E] outline-none cursor-pointer focus:border-[#E07A5F]"
-                  />
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {isLoadingData ? (
+                    <div className="flex items-center gap-1.5 text-xs text-[#9C887B] py-0.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E89874]" /> Loading...
+                    </div>
+                  ) : (
+                    categories.map((cat) => {
+                      const isSelected = selectedCategoryId === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setSelectedCategoryId(cat.id)}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-xl border-2 text-[11px] font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#FFF3EC] border-[#F2A68D] text-[#4A3228] shadow-xs'
+                              : 'bg-[#FFFBF5] border-[#EAE0D3] text-[#7A685D] hover:bg-[#F7EFE6]'
+                          }`}
+                        >
+                          <span>{cat.icon || '📖'}</span>
+                          <span>{cat.name}</span>
+                        </button>
+                      );
+                    })
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsCategoryModalOpen(true)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border-2 border-dashed border-[#D6C7B8] bg-[#FFFBF5] text-[#9C887B] hover:bg-[#F7EFE6] text-[11px] font-bold transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Category</span>
+                  </button>
                 </div>
               </div>
+
+              {/* Tags */}
+              <div>
+                <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#5C4639] mb-1.5">
+                  <TagIcon className="w-3.5 h-3.5 text-[#8C7A6B]" />
+                  Tags
+                </label>
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {isLoadingData ? (
+                    <div className="flex items-center gap-1.5 text-xs text-[#9C887B] py-0.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E89874]" /> Loading...
+                    </div>
+                  ) : (
+                    availableTags.map((tag, idx) => {
+                      const isSelected = selectedTagNames.includes(tag.name);
+                      const colorScheme = TAG_COLORS[idx % TAG_COLORS.length];
+
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => handleToggleTag(tag.name)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? `${colorScheme.bg} ${colorScheme.text} ${colorScheme.border} shadow-xs`
+                              : 'bg-[#FFFBF5] border-[#EAE0D3] text-[#7A685D] hover:bg-[#F7EFE6]'
+                          }`}
+                        >
+                          <span>#{tag.name}</span>
+                          {isSelected && <X className="w-3 h-3 opacity-70 hover:opacity-100" />}
+                        </button>
+                      );
+                    })
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsTagModalOpen(true)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-xl border-2 border-dashed border-[#D6C7B8] bg-[#FFFBF5] text-[#9C887B] hover:bg-[#F7EFE6] text-[11px] font-bold transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Tag</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Date & Time */}
+              <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+                <div>
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-[#5C4639] mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#8C7A6B]" />
+                    Due Date
+                  </label>
+                  <div className="relative flex items-center">
+                    <Calendar className="w-3.5 h-3.5 text-[#9C887B] absolute left-3 pointer-events-none z-10" />
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      onClick={(e) => e.currentTarget.showPicker?.()}
+                      className="w-full pl-8 pr-6 py-2 rounded-xl bg-[#FFFBF5] border-2 border-[#EAE0D3] text-xs font-bold text-[#4A3228] outline-none cursor-pointer focus:border-[#E89874] appearance-none"
+                    />
+                    <ChevronDown className="w-3.5 h-3.5 text-[#9C887B] absolute right-2.5 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-[#5C4639] mb-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#8C7A6B]" />
+                    Time (Optional)
+                  </label>
+                  <div className="relative flex items-center">
+                    <Clock className="w-3.5 h-3.5 text-[#9C887B] absolute left-3 pointer-events-none z-10" />
+                    <input
+                      type="time"
+                      value={dueTime}
+                      onChange={(e) => setDueTime(e.target.value)}
+                      onClick={(e) => e.currentTarget.showPicker?.()}
+                      className="w-full pl-8 pr-6 py-2 rounded-xl bg-[#FFFBF5] border-2 border-[#EAE0D3] text-xs font-bold text-[#4A3228] outline-none cursor-pointer focus:border-[#E89874] appearance-none"
+                    />
+                    <ChevronDown className="w-3.5 h-3.5 text-[#9C887B] absolute right-2.5 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-3">
-              <Button
-                type="button"
-                variant="secondary"
-                fullWidth
-                onClick={onClose}
-                disabled={isSubmitting}
-                className="bg-[#FAF6F0] border-[#EADBC8] text-[#6C5B52] hover:bg-[#EADBC8] text-xs font-black py-3"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                fullWidth
-                disabled={isSubmitting}
-                className="bg-[#E89874] hover:bg-[#d88763] text-white border-none shadow-xs text-xs font-black py-3 flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Adding...
-                  </>
-                ) : (
-                  <>
-                    Add Task 🐾
-                  </>
-                )}
-              </Button>
+            {/* Footer Actions */}
+            <div className="pt-1.5 flex items-center justify-between relative">
+              <div className="absolute -left-1 -bottom-1 text-[#C4A482] text-[10px] font-bold rotate-[-6deg] select-none pointer-events-none hidden sm:block">
+                <span>You got this! ♡</span>
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto sm:ml-auto">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-[#F0E4D8] text-[#6E5A4E] hover:bg-[#E5D7C9] text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-[#EE8866] hover:bg-[#E07755] text-white text-xs font-bold shadow-md shadow-[#EE8866]/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" /> Add Task
+                      <PawPrint className="w-3 h-3 fill-white text-white ml-0.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+
             </div>
           </form>
         </div>
       </div>
 
-      {/* 巢狀彈窗：Category */}
       <CreateCategoryModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         onSuccess={handleCategoryCreated}
       />
 
-      {/* 巢狀彈窗：Tag */}
       <AddTagModal
         isOpen={isTagModalOpen}
         onClose={() => setIsTagModalOpen(false)}

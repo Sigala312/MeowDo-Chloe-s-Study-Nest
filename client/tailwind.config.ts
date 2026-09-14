@@ -9,6 +9,8 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+      sans: ['var(--font-fredoka)', 'sans-serif']},
       colors: {
         "cat-bg": "#FAF7F2",      // 復古暖奶油白背景
         "cat-accent": "#E07A5F",  // 溫暖珊瑚粉

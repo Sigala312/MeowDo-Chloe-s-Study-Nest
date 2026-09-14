@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js'; // 👈 1. 改用共用的 prisma 實例
 import { CreateCategoryInput, UpdateCategoryInput } from './category.schema.js';
+import { NotificationService } from '../Notification/notification.service.js'; // 👈 1. 引入 NotificationService
 
 export class CategoryService {
   // 1. 取得該使用者的所有分類
@@ -30,12 +31,23 @@ export class CategoryService {
       throw new Error('CATEGORY_EXISTS');
     }
 
-    return await prisma.category.create({
+    // 建立分類
+    const newCategory = await prisma.category.create({
       data: {
         ...data,
         userId,
       },
     });
+
+    // 👈 2. 成功建立分類後，觸發新增分類通知
+    try {
+      await NotificationService.notifyCategoryCreated(userId, newCategory.name);
+    } catch (error) {
+      // 避免通知發送失敗導致整個分類建立 API 崩潰，這裡可以只印出錯誤記錄
+      console.error('Failed to send category created notification:', error);
+    }
+
+    return newCategory;
   }
 
   // 3. 更新分類

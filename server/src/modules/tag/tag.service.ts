@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js';
 import { CreateTagInput, UpdateTagInput } from './tag.schema.js';
+import { NotificationService } from '../Notification/notification.service.js';
 
 export class TagService {
   // 1. 取得該使用者的所有標籤
@@ -28,12 +29,21 @@ export class TagService {
       throw new Error('TAG_EXISTS');
     }
 
-    return await prisma.tag.create({
+    const newTag = await prisma.tag.create({
       data: {
         ...data,
         userId,
       },
     });
+
+    // 👈 2. 成功建立標籤後觸發通知
+    try {
+      await NotificationService.notifyTagCreated(userId, newTag.name);
+    } catch (error) {
+      console.error('Failed to send tag created notification:', error);
+    }
+
+    return newTag;
   }
 
   // 3. 更新標籤

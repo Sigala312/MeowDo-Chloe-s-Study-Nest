@@ -1,4 +1,6 @@
 import { prisma } from '../../lib/prisma.js';
+import { NotificationService } from '../Notification/notification.service.js';
+
 
 export class WheelService {
   /**
@@ -30,6 +32,16 @@ export class WheelService {
       orderBy: { createdAt: 'desc' },
     });
 
+    const userDrawLogs = await prisma.wheelDrawLog.findMany({
+      where: { userId },
+      include: { reward: true },
+    });
+
+    // 2. 宣告並去除重複的獎品名稱
+    const drawnRewardTitles = Array.from(
+      new Set(userDrawLogs.map((log) => log.reward.title))
+    );
+
     return {
       tomatoes: user.tomatoes,
       todayTomatoesCount: todayTomatoes,
@@ -41,6 +53,7 @@ export class WheelService {
           }
         : null,
       rewards,
+      drawnRewardTitles,
     };
   }
 
@@ -94,11 +107,20 @@ export class WheelService {
       },
     });
 
+    // 👈 2. 檢查是否剛好累積滿 30 個罐頭，發送抽獎解鎖通知
+    if (user.tomatoes < 30 && updatedUser.tomatoes >= 30) {
+      try {
+        await NotificationService.notifyCatFoodEarned(userId, updatedUser.tomatoes);
+      } catch (err) {
+        console.error('Failed to send 30 tomatoes milestone notification:', err);
+      }
+    }
+
     return {
       success: true,
       message: isBonusTriggered
         ? '🎉 Completed 7 tasks today! Earned 1 cat food + 3 bonus cat foods! 🥫'
-    : `Successfully earned ${earnedTomatoes} cat food! 🥫`,
+        : `Successfully earned ${earnedTomatoes} cat food! 🥫`,
       earnedTomatoes,
       tomatoes: updatedUser.tomatoes,
       todayTomatoesCount: updatedUser.todayTomatoesCount,
@@ -137,6 +159,13 @@ export class WheelService {
         include: { reward: true },
       }),
     ]);
+
+    // 👈 3. 抽獎成功，發送中獎通知
+    try {
+      await NotificationService.notifyWheelResult(userId, drawLog.reward.title);
+    } catch (err) {
+      console.error('Failed to send wheel reward notification:', err);
+    }
 
     return {
       drawnReward: drawLog.reward,

@@ -8,6 +8,7 @@ import categoryRouter from './modules/category/category.router.js';
 import tagRouter from './modules/tag/tag.router.js';
 import wheelRouter from './modules/wheel/wheel.router.js';
 import taskRouter from './modules/task/task.router.js';
+import notificationRouter from './modules/Notification/notification.router.js';
 
 
 // 載入環境變數
@@ -42,6 +43,8 @@ app.use('/api/category', categoryRouter);
 app.use('/api/tag', tagRouter);
 
 app.use('/api/task', taskRouter);
+
+app.use('/api/notification', notificationRouter);
 
 app.use('/api/wheel', wheelRouter);
 

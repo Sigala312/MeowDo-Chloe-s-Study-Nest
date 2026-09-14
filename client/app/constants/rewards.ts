@@ -11,7 +11,7 @@ export const REWARD_ASSETS: Record<string, RewardAsset> = {
     tagColor: 'text-[#C85A32]',
   },
   play_games: {
-    image: '/badges/play-games.png',
+    image: '/螢幕擷取畫面_2026-09-08_012349-removebg-preview.png',
     tagBg: 'bg-[#E8E5F7]',
     tagColor: 'text-[#6B5BB9]',
   },

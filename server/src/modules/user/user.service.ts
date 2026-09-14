@@ -1,5 +1,7 @@
 import { prisma } from '../../lib/prisma.js';
 import { UpdateProfileInput } from './user.schema.js';
+import { NotificationService } from '../Notification/notification.service.js';
+
 
 export class UserService {
   // 取得使用者個人資料
@@ -28,7 +30,7 @@ export class UserService {
 
   // 更新個人資料
   static async updateProfile(userId: string, data: UpdateProfileInput) {
-    return await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
       data,
       select: {
@@ -39,5 +41,15 @@ export class UserService {
         avatarUrl: true,
       },
     });
+
+    // 👈 2. 成功更新後發送個人資料異動通知
+    try {
+      await NotificationService.notifyProfileUpdated(userId);
+    } catch (error) {
+      console.error('Failed to send profile updated notification:', error);
+    }
+
+    return updatedUser;
   }
+
 }
