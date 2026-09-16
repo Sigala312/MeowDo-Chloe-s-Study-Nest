@@ -84,6 +84,8 @@ if (!drawnReward || !drawnReward.imageKey) {
           reward: drawnReward,
         });
         setShowModal(true);
+
+        window.dispatchEvent(new Event('wheel-spun'));
       }, 4000);
 
     } catch (error) {

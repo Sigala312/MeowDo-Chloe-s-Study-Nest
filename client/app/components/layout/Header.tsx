@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, CheckCheck, Trash2, ArrowRightCircle } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, Eye, Check } from 'lucide-react';
 import { usePageHeader } from '../context/PageHeaderContext';
 import { DropdownMenu, UserProfile } from '../ui/DropdownMenu';
 import { TomatoBadge } from '../ui/TomatoBadge';
@@ -129,7 +129,8 @@ export default function Header() {
   };
 
   // 標記單筆或全部已讀
-  const handleMarkAsRead = async (notificationIds?: string[]) => {
+  const handleMarkAsRead = async (notificationIds?: string[], e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -181,20 +182,16 @@ export default function Header() {
     }
   };
 
-  // 點擊通知跳轉
+  // 點擊通知項目：僅標為已讀，不進入連結
   const handleItemClick = (item: NotificationItem) => {
     if (!item.isRead) {
       handleMarkAsRead([item.id]);
-    }
-    if (item.linkUrl) {
-      setIsOpen(false);
-      router.push(item.linkUrl);
     }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    router.push('/login');
+    router.push('/');
   };
 
   return (
@@ -241,10 +238,8 @@ export default function Header() {
             onClick={toggleDropdown}
             className="group relative p-2.5 rounded-2xl bg-[#FFFDF9]/80 backdrop-blur-md border border-[#EADBC8] text-[#6C5B52] hover:bg-white transition-all shadow-xs cursor-pointer overflow-visible"
           >
-            {/* 鈴鐺圖示：滑鼠靠近觸發 YT 風格左右搖晃 */}
             <Bell className="w-4 h-4 animate-bell-ring" />
 
-            {/* 未讀紅點：加上 ping 脈衝波與邊框，解決無法顯示的問題 */}
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-3 w-3 z-10">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E07A5F] opacity-75"></span>
@@ -268,7 +263,7 @@ export default function Header() {
                 </div>
                 {unreadCount > 0 && (
                   <button
-                    onClick={() => handleMarkAsRead()}
+                    onClick={(e) => handleMarkAsRead(undefined, e)}
                     className="text-xs font-semibold text-[#8C7A6B] hover:text-[#E07A5F] flex items-center gap-1 transition-colors cursor-pointer"
                   >
                     <CheckCheck className="w-3.5 h-3.5" />
@@ -293,7 +288,7 @@ export default function Header() {
                       key={item.id}
                       onClick={() => handleItemClick(item)}
                       className={`p-3.5 transition-colors cursor-pointer flex items-start gap-3 relative group/item ${
-                        item.isRead ? 'bg-transparent opacity-75' : 'bg-[#E07A5F]/5'
+                        item.isRead ? 'bg-transparent opacity-70' : 'bg-[#E07A5F]/5'
                       } hover:bg-white/80`}
                     >
                       {!item.isRead && (
@@ -308,15 +303,25 @@ export default function Header() {
                             {new Date(item.createdAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className="text-xs text-[#6C5B52] leading-relaxed line-clamp-2">
+                        <p className="text-xs text-[#6C5B52] leading-relaxed">
                           {item.content}
                         </p>
                       </div>
 
-                      {/* Action Icon (Delete / Link) */}
+                      {/* Action Icons (Mark as Read / Delete) */}
                       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                        {item.linkUrl && (
-                          <ArrowRightCircle className="w-4 h-4 text-[#E07A5F] hover:scale-110 transition-transform" />
+                        {!item.isRead ? (
+                          <button
+                            onClick={(e) => handleMarkAsRead([item.id], e)}
+                            className="p-1 rounded-md text-[#8C7A6B] hover:text-[#E07A5F] hover:bg-[#FAF6F0] transition-colors cursor-pointer"
+                            title="Mark as read"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <span title="Read">
+                            <Check className="w-3.5 h-3.5 text-[#7A9A70] p-0.5" />
+                          </span>
                         )}
                         <button
                           onClick={(e) => handleDelete(item.id, e)}

@@ -11,7 +11,9 @@ import {
   Gift,
   Loader2,
   Sparkles,
-  PawPrint
+  PawPrint,
+  Check,
+  X
 } from 'lucide-react';
 import { usePageHeader } from '../../components/context/PageHeaderContext';
 import { REWARD_ASSETS } from '../../constants/rewards';
@@ -62,6 +64,9 @@ export default function ProfileSettingsPage() {
   const [email, setEmail] = useState('');
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
+  
+  // 彈跳視窗 State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -78,6 +83,9 @@ export default function ProfileSettingsPage() {
 
       if (res.ok) {
         const data = result.data || result;
+
+        console.log('🔍 [API raw data]:', data);
+        console.log('🔍 [drawnRewardTitles]:', data.drawnRewardTitles);
         
         if (data.drawnRewardTitles && Array.isArray(data.drawnRewardTitles)) {
           const formattedRewards: RewardItem[] = data.drawnRewardTitles.map((item: any) => {
@@ -90,6 +98,8 @@ export default function ProfileSettingsPage() {
               imageUrl: item.imageUrl || item.image || item.icon,
             };
           });
+
+          console.log('🔍 [formattedRewards]:', formattedRewards);
           setDrawnRewards(formattedRewards);
         }
 
@@ -141,7 +151,10 @@ export default function ProfileSettingsPage() {
     window.addEventListener('wheel-spun', fetchWheelRewards);
     return () => {
       window.removeEventListener('wheel-spun', fetchWheelRewards);
+      setHeader({ title: '', subtitle: '' }); // 👈 清除上一頁殘留的標題
     };
+
+   
   }, [setHeader, API_URL, fetchWheelRewards]);
 
   // 處理頭像更換
@@ -173,7 +186,7 @@ export default function ProfileSettingsPage() {
 
         const result = await res.json();
         if (res.ok && result.success) {
-          alert('Avatar updated successfully! 🐾');
+          setShowSuccessModal(true);
           window.dispatchEvent(new Event('user-profile-updated'));
         } else {
           alert(result.message || 'Upload failed.');
@@ -208,7 +221,7 @@ export default function ProfileSettingsPage() {
       const result = await res.json();
 
       if (res.ok && result.success) {
-        alert('Profile updated successfully! 🐾');
+        setShowSuccessModal(true);
         setProfile((prev) => (prev ? { ...prev, name: displayName, bio, location } : null));
         window.dispatchEvent(new Event('user-profile-updated'));
       } else {
@@ -229,16 +242,6 @@ export default function ProfileSettingsPage() {
         year: 'numeric',
       })
     : 'May 12, 2024';
-
-  const formatDate = (dateString: string) => {
-    const d = new Date(dateString);
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
 
   if (isLoading) {
     return (
@@ -449,91 +452,134 @@ export default function ProfileSettingsPage() {
               </div>
             </div>
 
-           {/* My Rewards 卡片 */}
-<div className="bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-xs">
-  <div className="flex items-center justify-between mb-5">
-    <div className="flex items-center gap-2">
-      <Gift className="w-5 h-5 text-[#E07A5F]" />
-      <h2 className="text-lg font-black text-[#3D2C2E]">My Rewards</h2>
-    </div>
-    <span className="text-xs font-bold text-[#8C7A6B] bg-[#FAF6F0] border border-[#EADBC8] px-3 py-1 rounded-full">
-      {drawnRewards.length} Won
-    </span>
-  </div>
+            {/* My Rewards 卡片 */}
+            <div className="bg-[#FFFDF9] border border-[#EADBC8] rounded-3xl p-6 shadow-xs">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-[#E07A5F]" />
+                  <h2 className="text-lg font-black text-[#3D2C2E]">My Rewards</h2>
+                </div>
+                <span className="text-xs font-bold text-[#8C7A6B] bg-[#FAF6F0] border border-[#EADBC8] px-3 py-1 rounded-full">
+                  {drawnRewards.length} Won
+                </span>
+              </div>
 
-  {isRewardsLoading ? (
-    <div className="flex items-center justify-center py-10">
-      <Loader2 className="w-6 h-6 animate-spin text-[#E89874]" />
-    </div>
-  ) : drawnRewards.length === 0 ? (
-    <div className="text-center py-8 bg-[#FAF6F0]/60 border border-dashed border-[#EADBC8] rounded-2xl p-4">
-      <Sparkles className="w-8 h-8 text-[#DFA382] mx-auto mb-2 opacity-60" />
-      <p className="text-xs font-bold text-[#6C5B52]">No rewards yet</p>
-      <p className="text-[11px] font-medium text-[#A08D80] mt-0.5">
-        Spin the wheel to get exciting prizes! 🐾
-      </p>
-    </div>
-  ) : (
-    /* 改為 2 欄網格布局，放大圖片視覺 */
-    <div className="grid grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1">
-      {drawnRewards.map((reward, index) => {
-        const isLatest = lastDraw?.rewardTitle === reward.title;
-
-        // 轉為蛇形命名進行匹配
-        const rawKey = reward.imageKey || reward.title || '';
-        const normalizedKey = rawKey
-          .trim()
-          .toLowerCase()
-          .replace(/[\s-]+/g, '_');
-
-        const matchedAsset = REWARD_ASSETS[normalizedKey] || REWARD_ASSETS[rawKey];
-        const displayImage = matchedAsset?.image || reward.imageUrl || (isLatest ? lastDraw?.imageUrl : null);
-        const isRedeemed = isLatest && lastDraw?.isRedeemed;
-
-        return (
-          <div
-            key={index}
-            className={`group relative flex flex-col items-center justify-center p-4 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8]/70 hover:border-[#E89874] transition-all hover:shadow-xs text-center ${
-              isRedeemed ? 'opacity-60 grayscale' : ''
-            }`}
-          >
-            {/* 放大顯示圖片外框 */}
-            <div className="relative w-20 h-20 rounded-2xl bg-[#FFFDF9] border border-[#EADBC8]/50 flex items-center justify-center shrink-0 shadow-xs p-2 mb-2 group-hover:scale-105 transition-transform">
-              {displayImage ? (
-                <img
-                  src={displayImage}
-                  alt={reward.title}
-                  className="w-full h-full object-contain"
-                />
+              {isRewardsLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#E89874]" />
+                </div>
+              ) : drawnRewards.length === 0 ? (
+                <div className="text-center py-8 bg-[#FAF6F0]/60 border border-dashed border-[#EADBC8] rounded-2xl p-4">
+                  <Sparkles className="w-8 h-8 text-[#DFA382] mx-auto mb-2 opacity-60" />
+                  <p className="text-xs font-bold text-[#6C5B52]">No rewards yet</p>
+                  <p className="text-[11px] font-medium text-[#A08D80] mt-0.5">
+                    Spin the wheel to get exciting prizes! 🐾
+                  </p>
+                </div>
               ) : (
-                <Gift className="w-10 h-10 text-[#E07A5F]" />
+                <div className="grid grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1">
+                  {drawnRewards.map((reward, index) => {
+                    const isLatest = lastDraw?.rewardTitle === reward.title;
+                    const rawKey = reward.imageKey || reward.title || '';
+                    const normalizedKey = rawKey
+                      .trim()
+                      .toLowerCase()
+                      .replace(/[\s-]+/g, '_');
+
+                    const matchedAsset = REWARD_ASSETS[normalizedKey] || REWARD_ASSETS[rawKey];
+                    const displayImage = matchedAsset?.image || reward.imageUrl || (isLatest ? lastDraw?.imageUrl : null);
+                    const isRedeemed = isLatest && lastDraw?.isRedeemed;
+
+                    return (
+                      <div
+                        key={index}
+                        className={`group relative flex flex-col items-center justify-center p-4 rounded-2xl bg-[#FAF6F0] border border-[#EADBC8]/70 hover:border-[#E89874] transition-all hover:shadow-xs text-center ${
+                          isRedeemed ? 'opacity-60 grayscale' : ''
+                        }`}
+                      >
+                        <div className="relative w-20 h-20 rounded-2xl bg-[#FFFDF9] border border-[#EADBC8]/50 flex items-center justify-center shrink-0 shadow-xs p-2 mb-2 group-hover:scale-105 transition-transform">
+                          {displayImage ? (
+                            <img
+                              src={displayImage}
+                              alt={reward.title}
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <Gift className="w-10 h-10 text-[#E07A5F]" />
+                          )}
+                        </div>
+
+                        <p className="text-xs font-extrabold text-[#3D2C2E] line-clamp-1 w-full px-1">
+                          {reward.title}
+                        </p>
+
+                        {isRedeemed && (
+                          <span className="absolute top-2 right-2 text-[9px] font-extrabold text-[#8C7A6B] bg-[#EADBC8] px-1.5 py-0.5 rounded-md">
+                            Redeemed
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-
-            {/* 標題與日期 */}
-            <p className="text-xs font-extrabold text-[#3D2C2E] line-clamp-1 w-full px-1">
-              {reward.title}
-            </p>
-            
-            
-
-            {/* 已兌換時標示 */}
-            {isRedeemed && (
-              <span className="absolute top-2 right-2 text-[9px] font-extrabold text-[#8C7A6B] bg-[#EADBC8] px-1.5 py-0.5 rounded-md">
-                Redeemed
-              </span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  )}
-</div>
 
           </div>
 
         </div>
       </div>
+
+      {/* 成功更新個人資料彈窗 Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm bg-[#FAF7F2] border border-[#EADBC8] rounded-3xl p-6 shadow-xl flex flex-col items-center text-center">
+            
+            {/* 右上角關閉 X 按鈕 */}
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="absolute top-4 right-4 text-[#8C7A6B] hover:text-[#3D2C2E] transition-colors p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* 戴眼鏡貓咪插圖 */}
+            <div className="relative w-28 h-24 mb-2">
+              <img
+                src="/螢幕擷取畫面_2026-09-15_182157-removebg-preview.png" // 請確保 public 資料夾內有此圖片檔名
+                alt="Cat Illustration"
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            {/* 標題與綠色 Check */}
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-[#7A9A70] flex items-center justify-center text-white shrink-0">
+                <Check className="w-4 h-4 stroke-[3]" />
+              </div>
+              <h3 className="text-xl font-black text-[#3D2C2E]">
+                Profile Updated!
+              </h3>
+            </div>
+
+            {/* 內文說明 */}
+            <p className="text-xs font-bold text-[#8C7A6B] mb-6 leading-relaxed max-w-[220px]">
+              Your personal information has been updated successfully.
+            </p>
+
+            {/* Got it 按鈕 */}
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full py-3 bg-[#7A9A70] hover:bg-[#68855E] text-white font-extrabold text-xs rounded-2xl flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer border-none"
+            >
+              <span>Got it</span>
+              <PawPrint className="w-3.5 h-3.5 fill-white text-white shrink-0" />
+            </button>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

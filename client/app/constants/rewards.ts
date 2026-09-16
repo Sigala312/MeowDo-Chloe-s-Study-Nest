@@ -15,7 +15,7 @@ export const REWARD_ASSETS: Record<string, RewardAsset> = {
     tagBg: 'bg-[#E8E5F7]',
     tagColor: 'text-[#6B5BB9]',
   },
-  watch_movie: {
+  watch_a_movie: {
     image: '/螢幕擷取畫面_2026-09-08_012406-removebg-preview.png',
     tagBg: 'bg-[#FCE4EC]',
     tagColor: 'text-[#D81B60]',
@@ -31,6 +31,11 @@ export const REWARD_ASSETS: Record<string, RewardAsset> = {
     tagColor: 'text-[#2E7D32]',
   },
   pass_coffee_ticket: {
+    image: '/螢幕擷取畫面_2026-09-08_012412-removebg-preview.png',
+    tagBg: 'bg-[#FFE8CC]',
+    tagColor: 'text-[#D97706]',
+  },
+  合格咖啡兌換券: {
     image: '/螢幕擷取畫面_2026-09-08_012412-removebg-preview.png',
     tagBg: 'bg-[#FFE8CC]',
     tagColor: 'text-[#D97706]',

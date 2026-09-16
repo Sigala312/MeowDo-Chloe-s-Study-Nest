@@ -49,11 +49,14 @@ export default function TasksPage() {
 
   const handleToggleTask = async (id: string, currentStatus: boolean) => {
     const nextStatus = !currentStatus;
+    
+    // 1. 樂觀更新 (Optimistic UI)
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, isCompleted: nextStatus } : t)));
 
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${API_URL}/api/task/${id}`, {
+      
+      const res = await fetch(`${API_URL}/api/task/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -61,8 +64,25 @@ export default function TasksPage() {
         },
         body: JSON.stringify({ isCompleted: nextStatus }),
       });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        // 2. 🎯 發送全域事件通知：更新任務狀態與罐頭數量
+        window.dispatchEvent(new Event('task-updated'));
+
+        if (nextStatus) {
+          window.dispatchEvent(new Event('cat-food-updated'));
+          window.dispatchEvent(new Event('tomatoes-updated'));
+        }
+      } else {
+        // API 回傳失敗時還原狀態
+        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, isCompleted: currentStatus } : t)));
+      }
     } catch (err) {
       console.error('Failed to update task:', err);
+      // 發生 Exception 時還原狀態並重新抓取
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, isCompleted: currentStatus } : t)));
       fetchTasks();
     }
   };

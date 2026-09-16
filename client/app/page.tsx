@@ -82,7 +82,14 @@ export default function AuthFlow() {
         router.push('/Home');
       });
     } catch (err: any) {
-      setErrorMessage(err.message || 'Login failed. Please try again later.');
+      // 👈 修改處：登入失敗時跳出帶有指定圖片的 Modal
+      showAlert(
+        'Login Failed ',
+        err.message || 'Invalid email or password. Please try again.',
+        'error',
+        undefined,
+        '/螢幕擷取畫面_2026-09-15_023515-removebg-preview.png'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +99,13 @@ export default function AuthFlow() {
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setErrorMessage('Passwords do not match!');
+      showAlert(
+        'Sign Up Failed 😿',
+        'Passwords do not match!',
+        'error',
+        undefined,
+        '/螢幕擷取畫面_2026-09-15_023515-removebg-preview.png'
+      );
       return;
     }
 
@@ -118,7 +131,13 @@ export default function AuthFlow() {
         setView('login');
       });
     } catch (err: any) {
-      setErrorMessage(err.message || 'Sign up failed. Please try again later.');
+      showAlert(
+        'Sign Up Failed ',
+        err.message || 'Sign up failed. Please try again later.',
+        'error',
+        undefined,
+        '/螢幕擷取畫面_2026-09-15_023515-removebg-preview.png'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -138,46 +157,45 @@ export default function AuthFlow() {
       <div className="absolute inset-0 bg-gradient-to-br from-amber-50/20 via-transparent to-stone-900/10 pointer-events-none" />
 
       {/* Styled English Alert Modal */}
-<AnimatePresence>
-  {alertConfig.show && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="w-full max-w-xs bg-[#FAF6F0] rounded-3xl p-6 shadow-2xl border border-white/80 flex flex-col items-center text-center relative"
-      >
-        {/* 👈 判斷是否有圖片，有的話顯示 Image，沒有則顯示預設 Icon */}
-        {alertConfig.image ? (
-          <div className="relative w-20 h-20 mb-2">
-            <Image 
-              src={alertConfig.image} 
-              alt="Alert illustration" 
-              fill
-              className="object-contain"
-            />
-          </div>
-        ) : (
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-            alertConfig.type === 'success' ? 'bg-amber-100 text-[#8B5E3C]' : 'bg-red-100 text-red-600'
-          }`}>
-            {alertConfig.type === 'success' ? <CheckCircle2 className="w-7 h-7" /> : <AlertCircle className="w-7 h-7" />}
+      <AnimatePresence>
+        {alertConfig.show && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-xs bg-[#FAF6F0] rounded-3xl p-6 shadow-2xl border border-white/80 flex flex-col items-center text-center relative"
+            >
+              {alertConfig.image ? (
+                <div className="relative w-20 h-20 mb-2">
+                  <Image 
+                    src={alertConfig.image} 
+                    alt="Alert illustration" 
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+              ) : (
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                  alertConfig.type === 'success' ? 'bg-amber-100 text-[#8B5E3C]' : 'bg-red-100 text-red-600'
+                }`}>
+                  {alertConfig.type === 'success' ? <CheckCircle2 className="w-7 h-7" /> : <AlertCircle className="w-7 h-7" />}
+                </div>
+              )}
+
+              <h3 className="text-base font-bold text-[#6C4E31] mb-1">{alertConfig.title}</h3>
+              <p className="text-xs text-[#8B5E3C]/80 mb-5 font-medium leading-relaxed">{alertConfig.message}</p>
+
+              <button
+                onClick={closeAlert}
+                className="w-full py-2.5 bg-[#8B5E3C] hover:bg-[#784E2F] text-amber-50 font-bold rounded-xl shadow-md transition-all text-xs cursor-pointer active:scale-95"
+              >
+                Continue
+              </button>
+            </motion.div>
           </div>
         )}
-
-        <h3 className="text-base font-bold text-[#6C4E31] mb-1">{alertConfig.title}</h3>
-        <p className="text-xs text-[#8B5E3C]/80 mb-5 font-medium leading-relaxed">{alertConfig.message}</p>
-
-        <button
-          onClick={closeAlert}
-          className="w-full py-2.5 bg-[#8B5E3C] hover:bg-[#784E2F] text-amber-50 font-bold rounded-xl shadow-md transition-all text-xs cursor-pointer active:scale-95"
-        >
-          Continue
-        </button>
-      </motion.div>
-    </div>
-  )}
-</AnimatePresence>
+      </AnimatePresence>
 
       {/* Error Message Toast */}
       {errorMessage && (

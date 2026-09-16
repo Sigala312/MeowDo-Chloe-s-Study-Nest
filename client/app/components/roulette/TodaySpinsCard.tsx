@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { Coffee, Ticket, Sparkles } from 'lucide-react';
 
@@ -16,7 +16,7 @@ export const TodaySpinsCard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
 
   // 抓取轉盤狀態 API
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:8080/api/wheel/status', {
@@ -40,17 +40,22 @@ export const TodaySpinsCard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStatus();
 
-    // 監聽轉盤旋轉完成事件，抽完獎自動重新發送 API 取得最新狀態
+    // 🎯 監聽：抽獎完成、罐頭更新時，自動發送 API 重新取得最新次數與紀錄
     window.addEventListener('wheel-spun', fetchStatus);
+    window.addEventListener('tomatoes-updated', fetchStatus);
+    window.addEventListener('cat-food-updated', fetchStatus);
+
     return () => {
       window.removeEventListener('wheel-spun', fetchStatus);
+      window.removeEventListener('tomatoes-updated', fetchStatus);
+      window.removeEventListener('cat-food-updated', fetchStatus);
     };
-  }, []);
+  }, [fetchStatus]);
 
   // 格式化日期時間 (例如: Sep 8, 2026 16:32)
   const formatDrawnDate = (dateString: string) => {

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card } from '../ui/Card';
 import { ArrowRight, Calendar, Loader2 } from 'lucide-react';
 
@@ -19,6 +20,7 @@ interface UpcomingGroup {
 }
 
 export const UpcomingTasks: React.FC = () => {
+  const router = useRouter();
   const [upcomingGroups, setUpcomingGroups] = useState<UpcomingGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -155,10 +157,12 @@ export const UpcomingTasks: React.FC = () => {
         <h3 className="text-base font-extrabold text-[#3D2C2E]">Upcoming</h3>
         <button
           type="button"
-          className="inline-flex items-center gap-1 text-xs font-bold text-[#8C7A6B] hover:text-[#E07A5F] transition-colors"
+          onClick={() => router.push('/Home/tasks')}
+          className="inline-flex items-center gap-1 text-xs font-bold text-[#8C7A6B] hover:text-[#E07A5F] transition-colors cursor-pointer group"
         >
           <Calendar className="w-3.5 h-3.5" />
-          View Calendar <ArrowRight className="w-3.5 h-3.5" />
+          <span>View Calendar</span>
+          <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
         </button>
       </div>
 

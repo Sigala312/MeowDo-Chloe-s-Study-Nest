@@ -50,10 +50,15 @@ export const RewardListCard: React.FC = () => {
     // 初次載入
     fetchDrawnRewards();
 
+    const handleWheelSpun = () => {
+      setTimeout(() => {
+        fetchDrawnRewards();
+      }, 500); // 延遲 0.5 秒取得後端最新 state
+    };
     // 監聽轉盤旋轉完成事件
-    window.addEventListener('wheel-spun', fetchDrawnRewards);
+    window.addEventListener('wheel-spun', handleWheelSpun);
     return () => {
-      window.removeEventListener('wheel-spun', fetchDrawnRewards);
+      window.removeEventListener('wheel-spun',handleWheelSpun);
     };
   }, []);
 

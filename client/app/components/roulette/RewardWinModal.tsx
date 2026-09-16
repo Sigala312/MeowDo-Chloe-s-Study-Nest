@@ -52,9 +52,9 @@ export const RewardWinModal: React.FC<Props> = ({ isOpen, onClose, drawData }) =
             </h2>
             <PawPrint className="w-5 h-5 text-[#E07A5F]" />
           </div>
-          <p className="text-xs font-bold text-[#8C7A6B]">
+          {/* <p className="text-xs font-bold text-[#8C7A6B]">
             享受屬於自己的悠閒時光吧！
-          </p>
+          </p> */}
         </div>
 
         {/* 獎品圖片區域 */}
