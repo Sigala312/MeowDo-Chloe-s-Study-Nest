@@ -67,10 +67,23 @@ model Task {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tags Tag[]
+  tags TaskTag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model TaskTag {
+  taskId String
+  tagId  String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@id([taskId, tagId]) // 👈 這裡明確指定了 Primary Key！
+  @@index([tagId])
+  @@index([taskId])
 }
 
 // 3. 待辦分類模型
@@ -102,7 +115,7 @@ model Tag {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tasks Task[] // 多對多關聯 (Prisma 會自動處理隱式關聯表 _TaskToTag)
+  tasks TaskTag[] // 多對多關聯 (Prisma 會自動處理隱式關聯表 _TaskToTag)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
