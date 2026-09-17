@@ -11,7 +11,8 @@ router.post('/register', validateRequest(registerSchema), AuthController.registe
 router.post('/login', validateRequest(loginSchema), AuthController.login);
 
 // 2. Google 第三方登入
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], 
+  prompt: 'select_account',session: false }));
 router.get(
   '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login', session: false }),
