@@ -19,7 +19,8 @@ export const TodaySpinsCard: React.FC = () => {
   const fetchStatus = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:8080/api/wheel/status', {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const res = await fetch(`${API_URL}/api/wheel/status`, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },

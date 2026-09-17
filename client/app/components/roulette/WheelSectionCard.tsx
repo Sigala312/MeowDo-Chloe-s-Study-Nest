@@ -29,8 +29,8 @@ export const WheelSectionCard: React.FC = () => {
     try {
       // 1. 從前端儲存空間取得 Token
       const token = localStorage.getItem('token');
-
-      const res = await fetch('http://localhost:8080/api/wheel/spin', {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const res = await fetch(`${API_URL}/api/wheel/spin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
