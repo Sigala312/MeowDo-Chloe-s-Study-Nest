@@ -15,7 +15,7 @@ interface AddTagModalProps {
   onSuccess?: (newTag: TagData) => void;
 }
 
-const POPULAR_TAGS = ['React', 'Frontend', 'Important', 'Exam', 'Personal'];
+const POPULAR_TAGS = ['民法', '土地法規', '土地登記', '土地稅法', '歷屆試題', '重點筆記','買賣過戶', '保存登記', '繼承贈與', '節稅規劃', '不動產經紀', '重要案件'];
 
 export const AddTagModal: React.FC<AddTagModalProps> = ({
   isOpen,

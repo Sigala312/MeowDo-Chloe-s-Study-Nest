@@ -371,7 +371,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                 <div>
                   <label className="flex items-center gap-1 text-[11px] font-bold text-[#5C4639] mb-1.5">
                     <Clock className="w-3.5 h-3.5 text-[#8C7A6B]" />
-                    Time (Optional)
+                    Time 
                   </label>
                   <div className="relative flex items-center">
                     <Clock className="w-3.5 h-3.5 text-[#9C887B] absolute left-3 pointer-events-none z-10" />
