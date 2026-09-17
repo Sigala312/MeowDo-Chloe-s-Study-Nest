@@ -229,7 +229,7 @@ export default function Header() {
 
       {/* 右上角按鈕組 */}
       <div className="flex items-center gap-3 pointer-events-auto ml-auto">
-        <TomatoBadge apiUrl={API_URL} />
+        <TomatoBadge  />
 
         {/* 通知鈴鐺與下拉選單 */}
         <div className="relative" ref={dropdownRef}>

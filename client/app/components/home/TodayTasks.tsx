@@ -258,6 +258,10 @@ export const TodayTasks: React.FC = () => {
       <CreateCategoryModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
+        onSuccess={() => {
+    // 建立成功後的動作（例如：fetchTasks() 或 fetchCategories()）
+    setIsCategoryModalOpen(false);
+  }}
       />
 
       <AddTagModal

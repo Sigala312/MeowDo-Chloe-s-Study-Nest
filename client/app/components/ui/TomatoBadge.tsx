@@ -1,6 +1,7 @@
 // 在顯示罐頭數量的元件中 (例如 TomatoBadge.tsx 或 Header.tsx)
 import React, { useState, useEffect, useCallback } from 'react';
 
+
 export const TomatoBadge = () => {
   const [tomatoes, setTomatoes] = useState<number>(0);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
